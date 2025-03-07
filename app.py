@@ -5,6 +5,7 @@ from langchain.memory import ConversationBufferMemory
 import google.generativeai as genai
 import datetime
 import os
+import pickle
 
 # Set API Key
 genai.configure(api_key="your_actual_api_key_here")
@@ -17,27 +18,39 @@ st.set_page_config(page_title="AI Data Science Tutor", layout="wide")
 st.title("🤖 AI Data Science Tutor")
 st.markdown("Ask me anything about **Data Science!** I support **multi-turn conversations.**")
 
-# Sidebar - Memory Settings
+# File for storing persistent memory
+MEMORY_FILE = "chat_memory.pkl"
+
+# Function to load persistent memory
+def load_memory():
+    if os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, "rb") as f:
+            return pickle.load(f)
+    return {"messages": [], "timestamps": []}
+
+# Function to save memory persistently
+def save_memory():
+    with open(MEMORY_FILE, "wb") as f:
+        pickle.dump({"messages": st.session_state.messages, "timestamps": st.session_state.timestamps}, f)
+
+# Load persistent memory on app startup
+memory_data = load_memory()
+st.session_state.messages = memory_data["messages"]
+st.session_state.timestamps = memory_data["timestamps"]
+
+# Sidebar - Memory Settings (Private & Persistent)
 st.sidebar.header("⚙️ Chat Settings")
-memory_enabled = st.sidebar.checkbox("Enable Memory", value=True)
+st.sidebar.markdown("🔒 **Memory is private and persistent.**")
 
 if st.sidebar.button("🗑️ Clear Chat"):
     st.session_state.messages = []
     st.session_state.timestamps = []
-    if os.path.exists("chat_history.txt"):
-        os.remove("chat_history.txt")
+    if os.path.exists(MEMORY_FILE):
+        os.remove(MEMORY_FILE)
     st.success("Chat history cleared!")
 
-# Initialize Memory if Enabled
-if memory_enabled:
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-else:
-    memory = None  # No memory when disabled
-
-# Initialize Chat History
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-    st.session_state.timestamps = []  # Store timestamps
+# Initialize Memory (Persistent Lifetime Memory)
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
 # Function to check if the question is related to Data Science
 def is_data_science_question(question):
@@ -47,13 +60,6 @@ def is_data_science_question(question):
     
     question_lower = question.lower()
     return any(keyword in question_lower for keyword in keywords)
-
-# Function to save chat history to a file
-def save_chat_history():
-    with open("chat_history.txt", "w") as file:
-        for msg, timestamp in zip(st.session_state.messages, st.session_state.timestamps):
-            role = "User" if isinstance(msg, HumanMessage) else "AI Tutor"
-            file.write(f"[{timestamp}] {role}: {msg.content}\n")
 
 # User Input
 user_input = st.chat_input("Ask me a Data Science question...")
@@ -70,7 +76,7 @@ if user_input:
         response_text = "I'm here to assist with Data Science topics only. Please ask a Data Science-related question."
     else:
         # Retrieve Chat History from Memory
-        chat_history = memory.load_memory_variables({})["chat_history"] if memory_enabled else []
+        chat_history = memory.load_memory_variables({})["chat_history"]
 
         # Generate AI Response
         response = chat_model.predict_messages(chat_history + [HumanMessage(content=user_input)])
@@ -81,12 +87,9 @@ if user_input:
     st.session_state.messages.insert(1, AIMessage(content=response_text))
     st.session_state.timestamps.insert(1, response_timestamp)
 
-    # Save to Memory if Enabled
-    if memory_enabled:
-        memory.save_context({"input": user_input}, {"output": response_text})
-
-    # Save chat history to file
-    save_chat_history()
+    # Save to Memory & Persist
+    memory.save_context({"input": user_input}, {"output": response_text})
+    save_memory()  # Persist chat to file
 
 # Display Chat History (User Messages First)
 for msg, timestamp in zip(st.session_state.messages, st.session_state.timestamps):
