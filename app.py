@@ -1,5 +1,5 @@
 import streamlit as st
-from langchain_google.chat_models import ChatGoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import SystemMessage, AIMessage, HumanMessage
 from langchain.memory import ConversationBufferMemory
 
