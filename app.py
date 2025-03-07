@@ -36,9 +36,7 @@ else:
 
 # Initialize Chat History
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        SystemMessage(content="You are an AI tutor specialized in Data Science. Answer only Data Science-related questions.")
-    ]
+    st.session_state.messages = []
     st.session_state.timestamps = []  # Store timestamps
 
 # Function to save chat history to a file
@@ -54,9 +52,9 @@ user_input = st.chat_input("Ask me a Data Science question...")
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Append User Message & Timestamp
-    st.session_state.messages.append(HumanMessage(content=user_input))
-    st.session_state.timestamps.append(timestamp)
+    # Append User Message & Timestamp (User message always on top)
+    st.session_state.messages.insert(0, HumanMessage(content=user_input))
+    st.session_state.timestamps.insert(0, timestamp)
 
     # Retrieve Chat History from Memory
     chat_history = memory.load_memory_variables({})["chat_history"] if memory_enabled else []
@@ -64,10 +62,10 @@ if user_input:
     # Generate AI Response
     response = chat_model.predict_messages(chat_history + [HumanMessage(content=user_input)])
 
-    # Append AI Response & Timestamp
+    # Append AI Response & Timestamp (Directly below user message)
     response_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.session_state.messages.append(AIMessage(content=response.content))
-    st.session_state.timestamps.append(response_timestamp)
+    st.session_state.messages.insert(1, AIMessage(content=response.content))
+    st.session_state.timestamps.insert(1, response_timestamp)
 
     # Save to Memory if Enabled
     if memory_enabled:
@@ -76,7 +74,7 @@ if user_input:
     # Save chat history to file
     save_chat_history()
 
-# Display Chat History
+# Display Chat History (User Messages First)
 for msg, timestamp in zip(st.session_state.messages, st.session_state.timestamps):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
