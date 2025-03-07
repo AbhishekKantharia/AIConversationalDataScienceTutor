@@ -1,5 +1,7 @@
 streamlit
-langchain
-langchain_community
-langchain_google
 google-generativeai
+langchain
+langchain-google-genai
+deep-translator
+textwrap3
+python-dotenv
