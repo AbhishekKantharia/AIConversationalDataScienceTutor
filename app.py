@@ -39,6 +39,15 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
     st.session_state.timestamps = []  # Store timestamps
 
+# Function to check if the question is related to Data Science
+def is_data_science_question(question):
+    keywords = ["data science", "machine learning", "AI", "deep learning", "statistics", 
+                "Python", "NumPy", "Pandas", "Matplotlib", "scikit-learn", "neural networks",
+                "clustering", "regression", "classification", "time series", "data preprocessing"]
+    
+    question_lower = question.lower()
+    return any(keyword in question_lower for keyword in keywords)
+
 # Function to save chat history to a file
 def save_chat_history():
     with open("chat_history.txt", "w") as file:
@@ -56,20 +65,25 @@ if user_input:
     st.session_state.messages.insert(0, HumanMessage(content=user_input))
     st.session_state.timestamps.insert(0, timestamp)
 
-    # Retrieve Chat History from Memory
-    chat_history = memory.load_memory_variables({})["chat_history"] if memory_enabled else []
+    # Check if the question is related to Data Science
+    if not is_data_science_question(user_input):
+        response_text = "I'm here to assist with Data Science topics only. Please ask a Data Science-related question."
+    else:
+        # Retrieve Chat History from Memory
+        chat_history = memory.load_memory_variables({})["chat_history"] if memory_enabled else []
 
-    # Generate AI Response
-    response = chat_model.predict_messages(chat_history + [HumanMessage(content=user_input)])
+        # Generate AI Response
+        response = chat_model.predict_messages(chat_history + [HumanMessage(content=user_input)])
+        response_text = response.content
 
     # Append AI Response & Timestamp (Directly below user message)
     response_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.session_state.messages.insert(1, AIMessage(content=response.content))
+    st.session_state.messages.insert(1, AIMessage(content=response_text))
     st.session_state.timestamps.insert(1, response_timestamp)
 
     # Save to Memory if Enabled
     if memory_enabled:
-        memory.save_context({"input": user_input}, {"output": response.content})
+        memory.save_context({"input": user_input}, {"output": response_text})
 
     # Save chat history to file
     save_chat_history()
