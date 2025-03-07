@@ -1,7 +1,6 @@
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import SystemMessage, AIMessage, HumanMessage
-from langchain.memory import ConversationBufferMemory
 import google.generativeai as genai
 import datetime
 import os
@@ -10,14 +9,12 @@ import pickle
 # Set API Key
 genai.configure(api_key="your_actual_api_key_here")
 
-# Initialize Chat Model
-chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
-
 # Streamlit UI Setup
 st.set_page_config(page_title="AI Data Science Tutor", layout="wide")
-st.title("🤖 AI Data Science Tutor")
+st.title("🤖 AI Data Science Tutor - Powered by Google Gemini")
+st.markdown("Ask me anything about **Data Science!** I support **multi-turn conversations.**")
 
-# File to store chat sessions persistently
+# File to store chat sessions
 CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 
 # Function to load chat sessions
@@ -42,7 +39,7 @@ st.sidebar.header("📂 Chat Sessions")
 # Create a new chat
 if st.sidebar.button("➕ New Chat"):
     new_chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
-    st.session_state.chat_sessions[new_chat_id] = {"messages": [], "timestamps": []}
+    st.session_state.chat_sessions[new_chat_id] = {"messages": [], "timestamps": [], "model": "gemini-1.5-pro"}
     st.session_state.current_chat = new_chat_id
     save_chats()
 
@@ -67,18 +64,24 @@ if st.session_state.current_chat:
         save_chats()
         st.success(f"Chat '{st.session_state.current_chat}' cleared!")
 
-# Sidebar - Explore GPTs (Future Expansion)
-st.sidebar.header("🚀 Explore GPT Models")
-st.sidebar.radio("Select a model", ["GPT-3.5", "GPT-4", "Gemini-Pro", "Gemini-1.5"])
+# Sidebar - Choose Gemini Model
+st.sidebar.header("🚀 Select Google Model")
+selected_model = st.sidebar.radio("Choose a model:", ["gemini-pro", "gemini-1.5-pro"])
+if st.session_state.current_chat:
+    st.session_state.chat_sessions[st.session_state.current_chat]["model"] = selected_model
 
 # Ensure the selected chat session exists
 if st.session_state.current_chat:
     chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
     messages = chat_data["messages"]
     timestamps = chat_data["timestamps"]
+    model_name = chat_data["model"]
 else:
     st.warning("Please create a new chat to start chatting!")
     st.stop()
+
+# Initialize Chat Model with Selected Gemini Version
+chat_model = ChatGoogleGenerativeAI(model=model_name)
 
 # Function to check if the question is related to Data Science
 def is_data_science_question(question):
