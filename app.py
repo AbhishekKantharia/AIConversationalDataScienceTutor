@@ -2,13 +2,17 @@ import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import SystemMessage, AIMessage, HumanMessage
 from langchain.memory import ConversationBufferMemory
-
-# Set API Key (Alternatively, use env variables)
 import google.generativeai as genai
 
+# Set API Key (Alternatively, use env variables)
+
 genai.configure(api_key="your_actual_api_key_here")
-response = genai.GenerativeModel("gemini-pro").generate_content("Hello!")
-print(response.text)
+
+try:
+    response = genai.GenerativeModel("gemini-pro").generate_content("Hello!")
+    print(response.text)
+except Exception as e:
+    print("Error:", e)
 
 # Initialize Chat Model
 chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
