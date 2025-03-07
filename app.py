@@ -16,45 +16,73 @@ chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
 # Streamlit UI Setup
 st.set_page_config(page_title="AI Data Science Tutor", layout="wide")
 st.title("🤖 AI Data Science Tutor")
-st.markdown("Ask me anything about **Data Science!** I support **multi-turn conversations.**")
 
-# File for storing persistent memory
-MEMORY_FILE = "chat_memory.pkl"
+# File to store chat sessions persistently
+CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 
-# Function to load persistent memory
-def load_memory():
-    if os.path.exists(MEMORY_FILE):
-        with open(MEMORY_FILE, "rb") as f:
+# Function to load chat sessions
+def load_chats():
+    if os.path.exists(CHAT_SESSIONS_FILE):
+        with open(CHAT_SESSIONS_FILE, "rb") as f:
             return pickle.load(f)
-    return {"messages": [], "timestamps": []}
+    return {}
 
-# Function to save memory persistently
-def save_memory():
-    with open(MEMORY_FILE, "wb") as f:
-        pickle.dump({"messages": st.session_state.messages, "timestamps": st.session_state.timestamps}, f)
+# Function to save chat sessions
+def save_chats():
+    with open(CHAT_SESSIONS_FILE, "wb") as f:
+        pickle.dump(st.session_state.chat_sessions, f)
 
-# Load persistent memory on app startup
-memory_data = load_memory()
-st.session_state.messages = memory_data["messages"]
-st.session_state.timestamps = memory_data["timestamps"]
+# Load all chat sessions
+if "chat_sessions" not in st.session_state:
+    st.session_state.chat_sessions = load_chats()
 
-# Sidebar - Memory Settings (Private & Persistent)
-st.sidebar.header("⚙️ Chat Settings")
-st.sidebar.markdown("🔒 **Memory is private and persistent.**")
+# Sidebar - Chat Management
+st.sidebar.header("📂 Chat Sessions")
 
-if st.sidebar.button("🗑️ Clear Chat"):
-    st.session_state.messages = []
-    st.session_state.timestamps = []
-    if os.path.exists(MEMORY_FILE):
-        os.remove(MEMORY_FILE)
-    st.success("Chat history cleared!")
+# Create a new chat
+if st.sidebar.button("➕ New Chat"):
+    new_chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
+    st.session_state.chat_sessions[new_chat_id] = {"messages": [], "timestamps": []}
+    st.session_state.current_chat = new_chat_id
+    save_chats()
 
-# Initialize Memory (Persistent Lifetime Memory)
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+# Select existing chat
+chat_names = list(st.session_state.chat_sessions.keys())
+if chat_names:
+    selected_chat = st.sidebar.radio("💬 Select a Chat", chat_names)
+    st.session_state.current_chat = selected_chat
+
+# Ensure there's a selected chat
+if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chat_sessions:
+    if chat_names:
+        st.session_state.current_chat = chat_names[0]
+    else:
+        st.session_state.current_chat = None
+
+# Clear selected chat history
+if st.session_state.current_chat:
+    if st.sidebar.button("🗑️ Clear Chat"):
+        st.session_state.chat_sessions[st.session_state.current_chat]["messages"] = []
+        st.session_state.chat_sessions[st.session_state.current_chat]["timestamps"] = []
+        save_chats()
+        st.success(f"Chat '{st.session_state.current_chat}' cleared!")
+
+# Sidebar - Explore GPTs (Future Expansion)
+st.sidebar.header("🚀 Explore GPT Models")
+st.sidebar.radio("Select a model", ["GPT-3.5", "GPT-4", "Gemini-Pro", "Gemini-1.5"])
+
+# Ensure the selected chat session exists
+if st.session_state.current_chat:
+    chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
+    messages = chat_data["messages"]
+    timestamps = chat_data["timestamps"]
+else:
+    st.warning("Please create a new chat to start chatting!")
+    st.stop()
 
 # Function to check if the question is related to Data Science
 def is_data_science_question(question):
-    keywords = ["data science", "machine learning", "AI", "deep learning", "statistics", 
+    keywords = ["data science", "machine learning", "AI", "deep learning", "statistics",
                 "Python", "NumPy", "Pandas", "Matplotlib", "scikit-learn", "neural networks",
                 "clustering", "regression", "classification", "time series", "data preprocessing"]
     
@@ -67,32 +95,31 @@ user_input = st.chat_input("Ask me a Data Science question...")
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Append User Message & Timestamp (User message always on top)
-    st.session_state.messages.insert(0, HumanMessage(content=user_input))
-    st.session_state.timestamps.insert(0, timestamp)
+    # Append User Message & Timestamp
+    messages.insert(0, HumanMessage(content=user_input))
+    timestamps.insert(0, timestamp)
 
     # Check if the question is related to Data Science
     if not is_data_science_question(user_input):
         response_text = "I'm here to assist with Data Science topics only. Please ask a Data Science-related question."
     else:
-        # Retrieve Chat History from Memory
-        chat_history = memory.load_memory_variables({})["chat_history"]
-
+        # Retrieve Chat History
+        chat_history = [msg for msg in messages if isinstance(msg, AIMessage)]
+        
         # Generate AI Response
         response = chat_model.predict_messages(chat_history + [HumanMessage(content=user_input)])
         response_text = response.content
 
-    # Append AI Response & Timestamp (Directly below user message)
+    # Append AI Response & Timestamp
     response_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.session_state.messages.insert(1, AIMessage(content=response_text))
-    st.session_state.timestamps.insert(1, response_timestamp)
+    messages.insert(1, AIMessage(content=response_text))
+    timestamps.insert(1, response_timestamp)
 
-    # Save to Memory & Persist
-    memory.save_context({"input": user_input}, {"output": response_text})
-    save_memory()  # Persist chat to file
+    # Save chat session
+    save_chats()
 
 # Display Chat History (User Messages First)
-for msg, timestamp in zip(st.session_state.messages, st.session_state.timestamps):
+for msg, timestamp in zip(messages, timestamps):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
         st.markdown(f"**[{timestamp}]** {msg.content}")
