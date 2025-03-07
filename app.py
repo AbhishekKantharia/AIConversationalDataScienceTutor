@@ -11,11 +11,12 @@ genai.configure(api_key="your_actual_api_key_here")
 
 # Streamlit UI Setup
 st.set_page_config(page_title="AI Data Science Tutor", layout="wide")
-st.title("🤖 AI Data Science Tutor - Powered by Google Gemini")
+st.title("🤖 AI Data Science Tutor - Powered by Google Gemini 1.5 Pro Latest")
 st.markdown("Ask me anything about **Data Science!** I support **multi-turn conversations.**")
 
 # File to store chat sessions persistently
 CHAT_SESSIONS_FILE = "chat_sessions.pkl"
+LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"  # Always use the latest model
 
 # Function to load chat sessions
 def load_chats():
@@ -39,7 +40,7 @@ st.sidebar.header("📂 Chat Sessions")
 # Create a new chat
 if st.sidebar.button("➕ New Chat"):
     new_chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
-    st.session_state.chat_sessions[new_chat_id] = {"messages": [], "timestamps": [], "model": "gemini-1.5-pro"}
+    st.session_state.chat_sessions[new_chat_id] = {"messages": [], "timestamps": []}
     st.session_state.current_chat = new_chat_id
     save_chats()
 
@@ -56,24 +57,35 @@ if "current_chat" not in st.session_state or st.session_state.current_chat not i
     else:
         st.session_state.current_chat = None
 
-# Sidebar - Choose Gemini Model
-st.sidebar.header("🚀 Select Google Model")
-selected_model = st.sidebar.radio("Choose a model:", ["gemini-pro", "gemini-1.5-pro"])
+# Chat Rename Option
 if st.session_state.current_chat:
-    st.session_state.chat_sessions[st.session_state.current_chat]["model"] = selected_model
+    new_chat_name = st.sidebar.text_input("✏️ Rename Chat", value=st.session_state.current_chat)
+    if st.sidebar.button("✅ Save Name"):
+        if new_chat_name and new_chat_name not in st.session_state.chat_sessions:
+            st.session_state.chat_sessions[new_chat_name] = st.session_state.chat_sessions.pop(st.session_state.current_chat)
+            st.session_state.current_chat = new_chat_name
+            save_chats()
+            st.experimental_rerun()  # Refresh UI
+
+# Chat Delete Option
+if st.session_state.current_chat:
+    if st.sidebar.button("🗑️ Delete Chat"):
+        del st.session_state.chat_sessions[st.session_state.current_chat]
+        st.session_state.current_chat = chat_names[0] if chat_names else None
+        save_chats()
+        st.experimental_rerun()  # Refresh UI
 
 # Ensure the selected chat session exists
 if st.session_state.current_chat:
     chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
     messages = chat_data["messages"]
     timestamps = chat_data["timestamps"]
-    model_name = chat_data["model"]
 else:
     st.warning("Please create a new chat to start chatting!")
     st.stop()
 
-# Initialize Chat Model with Selected Gemini Version
-chat_model = ChatGoogleGenerativeAI(model=model_name)
+# Initialize Chat Model with the latest Google Gemini model
+chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
 
 # Function to check if the question is related to Data Science
 def is_data_science_question(question):
