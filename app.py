@@ -9,7 +9,7 @@ import google.generativeai as genai
 genai.configure(api_key="your_actual_api_key_here")
 
 try:
-    response = genai.GenerativeModel("gemini-pro").generate_content("Hello!")
+    response = genai.GenerativeModel("gemini-2.0-flash").generate_content("Hello!")
     print(response.text)
 except Exception as e:
     print("Error:", e)
