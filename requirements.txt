@@ -8,4 +8,3 @@ speechrecognition
 pydub
 nbformat
 nbconvert
-pyaudio
