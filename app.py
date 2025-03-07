@@ -14,7 +14,7 @@ st.set_page_config(page_title="AI Data Science Tutor", layout="wide")
 st.title("🤖 AI Data Science Tutor - Powered by Google Gemini")
 st.markdown("Ask me anything about **Data Science!** I support **multi-turn conversations.**")
 
-# File to store chat sessions
+# File to store chat sessions persistently
 CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 
 # Function to load chat sessions
@@ -55,14 +55,6 @@ if "current_chat" not in st.session_state or st.session_state.current_chat not i
         st.session_state.current_chat = chat_names[0]
     else:
         st.session_state.current_chat = None
-
-# Clear selected chat history
-if st.session_state.current_chat:
-    if st.sidebar.button("🗑️ Clear Chat"):
-        st.session_state.chat_sessions[st.session_state.current_chat]["messages"] = []
-        st.session_state.chat_sessions[st.session_state.current_chat]["timestamps"] = []
-        save_chats()
-        st.success(f"Chat '{st.session_state.current_chat}' cleared!")
 
 # Sidebar - Choose Gemini Model
 st.sidebar.header("🚀 Select Google Model")
