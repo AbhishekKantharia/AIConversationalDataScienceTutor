@@ -1,10 +1,5 @@
 streamlit
 langchain
-langchain_community
-langchain-google-genai
+langchain_google_genai
 google-generativeai
-fpdf
-speechrecognition
-pydub
-nbformat
-nbconvert
+requests
