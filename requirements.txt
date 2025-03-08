@@ -3,3 +3,5 @@ langchain
 langchain_google_genai
 google-generativeai
 requests
+speechrecognition
+pyaudio
