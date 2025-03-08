@@ -33,8 +33,8 @@
 ## **📥 Installation**
 ### **1️⃣ Clone the Repository**
 ```bash
-git clone https://github.com/yourusername/ai-data-science-tutor.git
-cd ai-data-science-tutor
+git clone https://github.com/yourusername/AIConversationalDataScienceTutor.git
+cd AIConversationalDataScienceTutor
 ```
 
 ### **2️⃣ Install Dependencies**
@@ -51,7 +51,7 @@ streamlit run app.py
 
 ## **🗂 Project Structure**
 ```
-📂 ai-data-science-tutor
+📂 AIConversationalDataScienceTutor
 ├── app.py                 # Main Streamlit application
 ├── requirements.txt        # Required dependencies
 ├── README.md               # Project documentation
