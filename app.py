@@ -65,7 +65,7 @@ if st.session_state.current_chat:
             st.session_state.chat_sessions[new_chat_name] = st.session_state.chat_sessions.pop(st.session_state.current_chat)
             st.session_state.current_chat = new_chat_name
             save_chats()
-            st.experimental_rerun()  # Refresh UI
+            st.rerun()  # Refresh UI after renaming
 
 # Chat Delete Option
 if st.session_state.current_chat:
@@ -73,7 +73,7 @@ if st.session_state.current_chat:
         del st.session_state.chat_sessions[st.session_state.current_chat]
         st.session_state.current_chat = chat_names[0] if chat_names else None
         save_chats()
-        st.experimental_rerun()  # Refresh UI
+        st.rerun()  # Refresh UI after deleting a chat
 
 # Ensure the selected chat session exists
 if st.session_state.current_chat:
