@@ -6,8 +6,6 @@ import datetime
 import os
 import pickle
 import requests
-import speech_recognition as sr
-import pyaudio
 
 # Set API Key
 genai.configure(api_key="your_actual_api_key_here")
@@ -15,7 +13,7 @@ genai.configure(api_key="your_actual_api_key_here")
 # File Paths
 CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 BANNED_IPS_FILE = "banned_ips.pkl"
-LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
+LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"  # Always use the latest model
 
 # Function to get the user's IP address
 def get_user_ip():
@@ -123,54 +121,48 @@ def is_data_science_question(question):
     question_lower = question.lower()
     return any(keyword in question_lower for keyword in keywords)
 
-# Function to capture voice input
-def voice_to_text():
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        st.info("🎤 Listening... Speak now!")
-        audio = recognizer.listen(source)
+# Function to detect server exploitation attempts
+def detect_exploit_attempts(question):
+    exploit_keywords = ["hack", "bypass", "exploit", "DDoS", "SQL injection", "crash", "attack"]
+    return any(keyword in question.lower() for keyword in exploit_keywords)
 
-    try:
-        text = recognizer.recognize_google(audio)
-        return text
-    except sr.UnknownValueError:
-        st.error("😕 Sorry, could not understand the audio.")
-    except sr.RequestError:
-        st.error("⚠️ Could not request results, check your internet connection.")
-    return None
-
-# Voice input button
-if st.sidebar.button("🎙️ Speak"):
-    spoken_text = voice_to_text()
-    if spoken_text:  
-        p = pyaudio.PyAudio()
-        for i in range(p.get_device_count()):
-            print(p.get_device_info_by_index(i))
-        st.success(f"🗣️ You said: {spoken_text}")
-        user_input = spoken_text
-    else:
-        user_input = None
-else:
-    user_input = st.chat_input("Ask me a Data Science question...")
+# User Input
+user_input = st.chat_input("Ask me a Data Science question...")
 
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    # Append User Message & Timestamp
     messages.insert(0, HumanMessage(content=user_input))
     timestamps.insert(0, timestamp)
 
+    # Check for exploit attempts
+    if detect_exploit_attempts(user_input):
+        banned_ips.add(user_ip)
+        save_banned_ips(banned_ips)
+        st.error("🚨 Suspicious activity detected! Your IP has been banned.")
+        st.stop()
+
+    # Check if the question is related to Data Science
     if not is_data_science_question(user_input):
-        response_text = "I'm here to assist with Data Science topics only."
+        response_text = "I'm here to assist with Data Science topics only. Please ask a Data Science-related question."
     else:
+        # Retrieve Chat History
         chat_history = [msg for msg in messages if isinstance(msg, AIMessage)]
+        
+        # Generate AI Response
         response = chat_model.predict_messages(chat_history + [HumanMessage(content=user_input)])
         response_text = response.content
 
+    # Append AI Response & Timestamp
+    response_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     messages.insert(1, AIMessage(content=response_text))
-    timestamps.insert(1, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    timestamps.insert(1, response_timestamp)
 
+    # Save chat session
     save_chats()
 
+# Display Chat History (User Messages First)
 for msg, timestamp in zip(messages, timestamps):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
