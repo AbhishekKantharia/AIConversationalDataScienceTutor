@@ -7,6 +7,7 @@ import os
 import pickle
 import requests
 import speech_recognition as sr
+import pyaudio
 
 # Set API Key
 genai.configure(api_key="your_actual_api_key_here")
@@ -141,7 +142,10 @@ def voice_to_text():
 # Voice input button
 if st.sidebar.button("🎙️ Speak"):
     spoken_text = voice_to_text()
-    if spoken_text:
+    if spoken_text:  
+        p = pyaudio.PyAudio()
+        for i in range(p.get_device_count()):
+            print(p.get_device_info_by_index(i))
         st.success(f"🗣️ You said: {spoken_text}")
         user_input = spoken_text
     else:
