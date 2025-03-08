@@ -5,30 +5,55 @@ import google.generativeai as genai
 import datetime
 import os
 import pickle
+import requests
 
 # Set API Key
 genai.configure(api_key="your_actual_api_key_here")
 
-# Streamlit UI Setup
-st.set_page_config(page_title="AI Data Science Tutor", layout="wide")
-st.title("🤖 AI Data Science Tutor - Powered by Google Gemini 1.5 Pro Latest")
-st.markdown("Ask me anything about **Data Science!** I support **multi-turn conversations.**")
-
-# File to store chat sessions persistently
+# File Paths
 CHAT_SESSIONS_FILE = "chat_sessions.pkl"
+BANNED_IPS_FILE = "banned_ips.pkl"
 LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"  # Always use the latest model
 
-# Function to load chat sessions
+# Function to get the user's IP address
+def get_user_ip():
+    try:
+        response = requests.get("https://api64.ipify.org?format=json")
+        return response.json()["ip"]
+    except:
+        return "Unknown"
+
+# Load banned IPs
+def load_banned_ips():
+    if os.path.exists(BANNED_IPS_FILE):
+        with open(BANNED_IPS_FILE, "rb") as f:
+            return pickle.load(f)
+    return set()
+
+# Save banned IPs
+def save_banned_ips(banned_ips):
+    with open(BANNED_IPS_FILE, "wb") as f:
+        pickle.dump(banned_ips, f)
+
+# Load chat sessions
 def load_chats():
     if os.path.exists(CHAT_SESSIONS_FILE):
         with open(CHAT_SESSIONS_FILE, "rb") as f:
             return pickle.load(f)
     return {}
 
-# Function to save chat sessions
+# Save chat sessions
 def save_chats():
     with open(CHAT_SESSIONS_FILE, "wb") as f:
         pickle.dump(st.session_state.chat_sessions, f)
+
+# Get user IP & check if banned
+user_ip = get_user_ip()
+banned_ips = load_banned_ips()
+
+if user_ip in banned_ips:
+    st.error("🚫 Your IP address has been banned due to suspicious activity.")
+    st.stop()  # Block execution
 
 # Load all chat sessions
 if "chat_sessions" not in st.session_state:
@@ -65,7 +90,7 @@ if st.session_state.current_chat:
             st.session_state.chat_sessions[new_chat_name] = st.session_state.chat_sessions.pop(st.session_state.current_chat)
             st.session_state.current_chat = new_chat_name
             save_chats()
-            st.rerun()  # Refresh UI after renaming
+            st.rerun()  # Refresh UI
 
 # Chat Delete Option
 if st.session_state.current_chat:
@@ -73,7 +98,7 @@ if st.session_state.current_chat:
         del st.session_state.chat_sessions[st.session_state.current_chat]
         st.session_state.current_chat = chat_names[0] if chat_names else None
         save_chats()
-        st.rerun()  # Refresh UI after deleting a chat
+        st.rerun()  # Refresh UI
 
 # Ensure the selected chat session exists
 if st.session_state.current_chat:
@@ -96,6 +121,11 @@ def is_data_science_question(question):
     question_lower = question.lower()
     return any(keyword in question_lower for keyword in keywords)
 
+# Function to detect server exploitation attempts
+def detect_exploit_attempts(question):
+    exploit_keywords = ["hack", "bypass", "exploit", "DDoS", "SQL injection", "crash", "attack"]
+    return any(keyword in question.lower() for keyword in exploit_keywords)
+
 # User Input
 user_input = st.chat_input("Ask me a Data Science question...")
 
@@ -105,6 +135,13 @@ if user_input:
     # Append User Message & Timestamp
     messages.insert(0, HumanMessage(content=user_input))
     timestamps.insert(0, timestamp)
+
+    # Check for exploit attempts
+    if detect_exploit_attempts(user_input):
+        banned_ips.add(user_ip)
+        save_banned_ips(banned_ips)
+        st.error("🚨 Suspicious activity detected! Your IP has been banned.")
+        st.stop()
 
     # Check if the question is related to Data Science
     if not is_data_science_question(user_input):
