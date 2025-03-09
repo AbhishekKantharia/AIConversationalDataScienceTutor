@@ -142,12 +142,12 @@ if user_input:
         chat_history = [msg for msg in messages if isinstance(msg, AIMessage)]
         response = chat_model.invoke(chat_history + [HumanMessage(content=user_input)])
 
-        # Streaming Response Like ChatGPT
+        # Streaming response like ChatGPT
         response_text = ""
         with st.chat_message("assistant"):
             for chunk in response.content.split():
                 response_text += chunk + " "
-                st.markdown(format_response(response_text))  # Format response for structured display
+                st.markdown(response_text)
 
     messages.insert(1, AIMessage(content=response_text))
     timestamps.insert(1, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
