@@ -88,6 +88,16 @@ else:
 # Initialize Chat Model with the latest Google Gemini model
 chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
 
+# Function to format structured responses
+def format_response(response_text):
+    """
+    Converts plain text responses into structured markdown-style responses.
+    """
+    formatted_response = response_text.replace("**", "**")  # Bold text
+    formatted_response = formatted_response.replace("* ", "- ")  # Bullet points
+    formatted_response = formatted_response.replace("```", "```python\n")  # Code Blocks
+    return formatted_response
+
 # Function to check if question is Data Science-related
 def is_data_science_question(question):
     keywords = ["data science", "machine learning", "AI", "deep learning", "statistics",
@@ -137,7 +147,7 @@ if user_input:
         with st.chat_message("assistant"):
             for chunk in response.content.split():
                 response_text += chunk + " "
-                st.markdown(response_text)
+                st.markdown(format_response(response_text))  # Format response for structured display
 
     messages.insert(1, AIMessage(content=response_text))
     timestamps.insert(1, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
