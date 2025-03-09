@@ -13,7 +13,7 @@ genai.configure(api_key="your_actual_api_key_here")
 # File Paths
 CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 BANNED_IPS_FILE = "banned_ips.pkl"
-LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"  # Always use the latest model
+LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 
 # Function to get the user's IP address
 def get_user_ip():
@@ -53,7 +53,7 @@ banned_ips = load_banned_ips()
 
 if user_ip in banned_ips:
     st.error("🚫 Your IP address has been banned due to suspicious activity.")
-    st.stop()  # Block execution
+    st.stop()
 
 # Load all chat sessions
 if "chat_sessions" not in st.session_state:
@@ -90,7 +90,7 @@ if st.session_state.current_chat:
             st.session_state.chat_sessions[new_chat_name] = st.session_state.chat_sessions.pop(st.session_state.current_chat)
             st.session_state.current_chat = new_chat_name
             save_chats()
-            st.rerun()  # Refresh UI
+            st.rerun()
 
 # Chat Delete Option
 if st.session_state.current_chat:
@@ -98,7 +98,20 @@ if st.session_state.current_chat:
         del st.session_state.chat_sessions[st.session_state.current_chat]
         st.session_state.current_chat = chat_names[0] if chat_names else None
         save_chats()
-        st.rerun()  # Refresh UI
+        st.rerun()
+
+# Unblock IP Addresses (Admin Feature)
+st.sidebar.header("🔓 Unblock IPs (Admin Only)")
+admin_password = st.sidebar.text_input("Enter Admin Password:", type="password")
+if admin_password == "admin123":  # Change this to a secure password
+    unblock_ip = st.sidebar.text_input("Enter IP to Unblock:")
+    if st.sidebar.button("✅ Unblock IP"):
+        if unblock_ip in banned_ips:
+            banned_ips.remove(unblock_ip)
+            save_banned_ips(banned_ips)
+            st.sidebar.success(f"✅ IP {unblock_ip} has been unblocked.")
+        else:
+            st.sidebar.warning(f"⚠️ IP {unblock_ip} is not banned.")
 
 # Ensure the selected chat session exists
 if st.session_state.current_chat:
@@ -151,7 +164,7 @@ if user_input:
         chat_history = [msg for msg in messages if isinstance(msg, AIMessage)]
         
         # Generate AI Response
-        response = chat_model.predict_messages(chat_history + [HumanMessage(content=user_input)])
+        response = chat_model.invoke(chat_history + [HumanMessage(content=user_input)])
         response_text = response.content
 
     # Append AI Response & Timestamp
