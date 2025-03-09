@@ -134,7 +134,7 @@ if user_input:
         response_text = "I'm here to assist with Data Science topics only."
     else:
         chat_history = [msg for msg in messages if isinstance(msg, AIMessage)]
-        response = chat_model.predict_messages(chat_history + [HumanMessage(content=user_input)])
+        response = chat_model.invoke(chat_history + [HumanMessage(content=user_input)])
 
         # Streaming response like ChatGPT
         response_text = ""
