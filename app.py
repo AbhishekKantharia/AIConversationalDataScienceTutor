@@ -6,6 +6,11 @@ import datetime
 import os
 import pickle
 import requests
+from dotenv import load_dotenv  # Secure password storage
+
+# Load environment variables
+load_dotenv()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 # Set API Key
 genai.configure(api_key="your_actual_api_key_here")
@@ -103,7 +108,8 @@ if st.session_state.current_chat:
 # Unblock IP Addresses (Admin Feature)
 st.sidebar.header("🔓 Unblock IPs (Admin Only)")
 admin_password = st.sidebar.text_input("Enter Admin Password:", type="password")
-if admin_password == "admin123":  # Change this to a secure password
+
+if admin_password and admin_password == ADMIN_PASSWORD:
     unblock_ip = st.sidebar.text_input("Enter IP to Unblock:")
     if st.sidebar.button("✅ Unblock IP"):
         if unblock_ip in banned_ips:
@@ -134,48 +140,27 @@ def is_data_science_question(question):
     question_lower = question.lower()
     return any(keyword in question_lower for keyword in keywords)
 
-# Function to detect server exploitation attempts
-def detect_exploit_attempts(question):
-    exploit_keywords = ["hack", "bypass", "exploit", "DDoS", "SQL injection", "crash", "attack"]
-    return any(keyword in question.lower() for keyword in exploit_keywords)
-
 # User Input
 user_input = st.chat_input("Ask me a Data Science question...")
 
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Append User Message & Timestamp
     messages.insert(0, HumanMessage(content=user_input))
     timestamps.insert(0, timestamp)
 
-    # Check for exploit attempts
-    if detect_exploit_attempts(user_input):
-        banned_ips.add(user_ip)
-        save_banned_ips(banned_ips)
-        st.error("🚨 Suspicious activity detected! Your IP has been banned.")
-        st.stop()
-
-    # Check if the question is related to Data Science
     if not is_data_science_question(user_input):
-        response_text = "I'm here to assist with Data Science topics only. Please ask a Data Science-related question."
+        response_text = "I'm here to assist with Data Science topics only."
     else:
-        # Retrieve Chat History
         chat_history = [msg for msg in messages if isinstance(msg, AIMessage)]
-        
-        # Generate AI Response
         response = chat_model.invoke(chat_history + [HumanMessage(content=user_input)])
         response_text = response.content
 
-    # Append AI Response & Timestamp
-    response_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     messages.insert(1, AIMessage(content=response_text))
-    timestamps.insert(1, response_timestamp)
+    timestamps.insert(1, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    # Save chat session
     save_chats()
 
-# Display Chat History (User Messages First)
 for msg, timestamp in zip(messages, timestamps):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
