@@ -1,6 +1,6 @@
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import SystemMessage, AIMessage, HumanMessage
+from langchain.schema import AIMessage, HumanMessage
 import google.generativeai as genai
 import datetime
 import os
@@ -15,25 +15,8 @@ CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 BANNED_IPS_FILE = "banned_ips.pkl"
 LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 
-# Function to get the user's IP address
-def get_user_ip():
-    try:
-        response = requests.get("https://api64.ipify.org?format=json")
-        return response.json()["ip"]
-    except:
-        return "Unknown"
-
-# Load banned IPs
-def load_banned_ips():
-    if os.path.exists(BANNED_IPS_FILE):
-        with open(BANNED_IPS_FILE, "rb") as f:
-            return pickle.load(f)
-    return set()
-
-# Save banned IPs
-def save_banned_ips(banned_ips):
-    with open(BANNED_IPS_FILE, "wb") as f:
-        pickle.dump(banned_ips, f)
+# Streamlit UI Setup
+st.set_page_config(page_title="ChatGPT Clone - AI Data Science Tutor", layout="wide")
 
 # Load chat sessions
 def load_chats():
@@ -47,20 +30,14 @@ def save_chats():
     with open(CHAT_SESSIONS_FILE, "wb") as f:
         pickle.dump(st.session_state.chat_sessions, f)
 
-# Get user IP & check if banned
-user_ip = get_user_ip()
-banned_ips = load_banned_ips()
-
-if user_ip in banned_ips:
-    st.error("🚫 Your IP address has been banned due to suspicious activity.")
-    st.stop()
-
 # Load all chat sessions
 if "chat_sessions" not in st.session_state:
     st.session_state.chat_sessions = load_chats()
 
-# Sidebar - Chat Management
-st.sidebar.header("📂 Chat Sessions")
+# Sidebar - ChatGPT-Style Layout
+st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg", width=60)
+st.sidebar.title("ChatGPT Clone")
+st.sidebar.markdown("**AI Data Science Tutor** - Powered by Google Gemini")
 
 # Create a new chat
 if st.sidebar.button("➕ New Chat"):
@@ -75,7 +52,7 @@ if chat_names:
     selected_chat = st.sidebar.radio("💬 Select a Chat", chat_names)
     st.session_state.current_chat = selected_chat
 
-# Ensure there's a selected chat
+# Ensure a chat is selected
 if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chat_sessions:
     if chat_names:
         st.session_state.current_chat = chat_names[0]
@@ -100,7 +77,7 @@ if st.session_state.current_chat:
         save_chats()
         st.rerun()
 
-# Ensure the selected chat session exists
+# Ensure chat session exists
 if st.session_state.current_chat:
     chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
     messages = chat_data["messages"]
@@ -112,7 +89,7 @@ else:
 # Initialize Chat Model with the latest Google Gemini model
 chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
 
-# Function to check if the question is related to Data Science
+# Function to check if question is Data Science-related
 def is_data_science_question(question):
     keywords = ["data science", "machine learning", "AI", "deep learning", "statistics",
                 "Python", "NumPy", "Pandas", "Matplotlib", "scikit-learn", "neural networks",
@@ -120,6 +97,18 @@ def is_data_science_question(question):
     
     question_lower = question.lower()
     return any(keyword in question_lower for keyword in keywords)
+
+# Chat Message Container
+st.title("🤖 ChatGPT Clone - AI Data Science Tutor")
+
+chat_container = st.container()
+
+# Display Chat History (Mimicking ChatGPT UI)
+with chat_container:
+    for msg, timestamp in zip(messages, timestamps):
+        role = "user" if isinstance(msg, HumanMessage) else "assistant"
+        with st.chat_message(role):
+            st.markdown(f"**[{timestamp}]** {msg.content}")
 
 # User Input
 user_input = st.chat_input("Ask me a Data Science question...")
@@ -136,18 +125,14 @@ if user_input:
         chat_history = [msg for msg in messages if isinstance(msg, AIMessage)]
         response = chat_model.invoke(chat_history + [HumanMessage(content=user_input)])
 
-        # Streaming response like ChatGPT
+        # Streaming Response Like ChatGPT
         response_text = ""
-        for chunk in response.content.split():
-            response_text += chunk + " "
-            st.markdown(f"**🤖 AI:** {response_text} | ⏳ Generating...")
+        with st.chat_message("assistant"):
+            for chunk in response.content.split():
+                response_text += chunk + " "
+                st.markdown(response_text)
 
     messages.insert(1, AIMessage(content=response_text))
     timestamps.insert(1, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     save_chats()
-
-for msg, timestamp in zip(messages, timestamps):
-    role = "user" if isinstance(msg, HumanMessage) else "assistant"
-    with st.chat_message(role):
-        st.markdown(f"**[{timestamp}]** {msg.content}")
