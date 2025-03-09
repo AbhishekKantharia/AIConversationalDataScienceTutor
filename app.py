@@ -7,16 +7,15 @@ import os
 import pickle
 import requests
 
-# Set API Key
+# Set API Key for Google Gemini AI
 genai.configure(api_key="your_actual_api_key_here")
 
 # File Paths
 CHAT_SESSIONS_FILE = "chat_sessions.pkl"
-BANNED_IPS_FILE = "banned_ips.pkl"
 LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 
 # Streamlit UI Setup
-st.set_page_config(page_title="ChatGPT Clone - AI Data Science Tutor", layout="wide")
+st.set_page_config(page_title="ChatGPT Clone - Free AI Data Science Tutor", layout="wide")
 
 # Load chat sessions
 def load_chats():
@@ -36,8 +35,8 @@ if "chat_sessions" not in st.session_state:
 
 # Sidebar - ChatGPT-Style Layout
 st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg", width=60)
-st.sidebar.title("ChatGPT Clone")
-st.sidebar.markdown("**AI Data Science Tutor** - Powered by Google Gemini")
+st.sidebar.title("ChatGPT Clone - Free AI")
+st.sidebar.markdown("🌟 **Premium AI Features for Free!**")
 
 # Create a new chat
 if st.sidebar.button("➕ New Chat"):
@@ -100,6 +99,14 @@ def is_data_science_question(question):
 
 # Chat Message Container
 st.title("🤖 ChatGPT Clone - AI Data Science Tutor")
+
+st.markdown("""
+### **🚀 Why Pay for Premium When It's Free Here?**
+💎 **Instant AI Responses (Like ChatGPT Plus)**  
+💎 **Multi-Chat Support - Rename, Delete, & Save Chats**  
+💎 **Streaming Answers (Token-by-Token Like OpenAI Pro)**  
+💎 **Google Gemini 1.5 Pro - No Limits, 100% Free!**  
+""")
 
 chat_container = st.container()
 
