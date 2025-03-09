@@ -13,7 +13,7 @@ genai.configure(api_key="your_actual_api_key_here")
 # File Paths
 CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 BANNED_IPS_FILE = "banned_ips.pkl"
-LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"  # Always use the latest model
+LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 
 # Function to get the user's IP address
 def get_user_ip():
@@ -53,7 +53,7 @@ banned_ips = load_banned_ips()
 
 if user_ip in banned_ips:
     st.error("🚫 Your IP address has been banned due to suspicious activity.")
-    st.stop()  # Block execution
+    st.stop()
 
 # Load all chat sessions
 if "chat_sessions" not in st.session_state:
@@ -90,7 +90,7 @@ if st.session_state.current_chat:
             st.session_state.chat_sessions[new_chat_name] = st.session_state.chat_sessions.pop(st.session_state.current_chat)
             st.session_state.current_chat = new_chat_name
             save_chats()
-            st.rerun()  # Refresh UI
+            st.rerun()
 
 # Chat Delete Option
 if st.session_state.current_chat:
@@ -98,7 +98,7 @@ if st.session_state.current_chat:
         del st.session_state.chat_sessions[st.session_state.current_chat]
         st.session_state.current_chat = chat_names[0] if chat_names else None
         save_chats()
-        st.rerun()  # Refresh UI
+        st.rerun()
 
 # Ensure the selected chat session exists
 if st.session_state.current_chat:
@@ -121,48 +121,32 @@ def is_data_science_question(question):
     question_lower = question.lower()
     return any(keyword in question_lower for keyword in keywords)
 
-# Function to detect server exploitation attempts
-def detect_exploit_attempts(question):
-    exploit_keywords = ["hack", "bypass", "exploit", "DDoS", "SQL injection", "crash", "attack"]
-    return any(keyword in question.lower() for keyword in exploit_keywords)
-
 # User Input
 user_input = st.chat_input("Ask me a Data Science question...")
 
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Append User Message & Timestamp
     messages.insert(0, HumanMessage(content=user_input))
     timestamps.insert(0, timestamp)
 
-    # Check for exploit attempts
-    if detect_exploit_attempts(user_input):
-        banned_ips.add(user_ip)
-        save_banned_ips(banned_ips)
-        st.error("🚨 Suspicious activity detected! Your IP has been banned.")
-        st.stop()
-
-    # Check if the question is related to Data Science
     if not is_data_science_question(user_input):
-        response_text = "I'm here to assist with Data Science topics only. Please ask a Data Science-related question."
+        response_text = "I'm here to assist with Data Science topics only."
     else:
-        # Retrieve Chat History
         chat_history = [msg for msg in messages if isinstance(msg, AIMessage)]
-        
-        # Generate AI Response
         response = chat_model.predict_messages(chat_history + [HumanMessage(content=user_input)])
-        response_text = response.content
 
-    # Append AI Response & Timestamp
-    response_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Streaming response like ChatGPT
+        response_text = ""
+        for chunk in response.content.split():
+            response_text += chunk + " "
+            st.markdown(f"**🤖 AI:** {response_text} | ⏳ Generating...")
+
     messages.insert(1, AIMessage(content=response_text))
-    timestamps.insert(1, response_timestamp)
+    timestamps.insert(1, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    # Save chat session
     save_chats()
 
-# Display Chat History (User Messages First)
 for msg, timestamp in zip(messages, timestamps):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
