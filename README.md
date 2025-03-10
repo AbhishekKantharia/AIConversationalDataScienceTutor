@@ -1,5 +1,3 @@
-### **📜 README.md**  
-
 # 🚀 ChatGPT-Style AI Data Science Tutor  
 ### Powered by Google Gemini 1.5 Pro | Multi-User Authentication | Secure & Free  
 
