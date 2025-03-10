@@ -1,7 +1,3 @@
-Here's a **professional README.md** for your **ChatGPT-Style AI Data Science Tutor** with **multi-user authentication, role-based access, and Google Gemini AI**. 🚀  
-
----
-
 ### **📜 README.md**  
 
 # 🚀 ChatGPT-Style AI Data Science Tutor  
