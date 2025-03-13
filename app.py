@@ -25,29 +25,65 @@ LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 # Streamlit Page Config
 st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
 
-# Sidebar - Toggle for Dark Mode
-st.sidebar.header("⚙️ Settings")
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = False  # Default to light mode
+# Custom 3D Styling with CSS
+st.markdown(
+    """
+    <style>
+    body { background-color: #121212; color: #e0e0e0; }
+    .stApp { background-color: #121212; }
+    
+    /* 3D Buttons */
+    .stButton>button {
+        background: linear-gradient(145deg, #1f1f1f, #292929);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        box-shadow: 3px 3px 6px #0a0a0a, -3px -3px 6px #333;
+        padding: 10px 20px;
+        transition: 0.2s;
+    }
+    .stButton>button:hover {
+        transform: scale(1.05);
+        box-shadow: 4px 4px 8px #000000, -4px -4px 8px #444;
+    }
 
-st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
+    /* Chat bubbles */
+    .stChatMessage {
+        background: linear-gradient(145deg, #1e1e1e, #252525);
+        padding: 12px;
+        border-radius: 10px;
+        box-shadow: 3px 3px 5px #0a0a0a, -3px -3px 5px #333;
+        margin-bottom: 10px;
+    }
 
-# Apply Dark/Light Mode Styling
-if st.session_state.dark_mode:
-    st.markdown(
-        """
-        <style>
-        body { background-color: #121212; color: #e0e0e0; }
-        .stApp { background-color: #121212; }
-        .stButton>button { background-color: #333; color: white; border-radius: 10px; }
-        .stTextInput>div>div>input { background-color: #222; color: white; border: 1px solid #555; }
-        .stSidebar { background-color: #181818; }
-        .stSidebar .stButton>button { background-color: #333; color: white; }
-        .stSidebar .stTextInput>div>div>input { background-color: #222; color: white; border: 1px solid #555; }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    /* Inputs */
+    .stTextInput>div>div>input {
+        background: #222;
+        color: white;
+        border: 2px solid #444;
+        border-radius: 8px;
+        padding: 10px;
+        transition: 0.2s;
+    }
+    .stTextInput>div>div>input:focus {
+        border-color: #888;
+        box-shadow: 0px 0px 5px #888;
+    }
+
+    /* Sidebar */
+    .stSidebar {
+        background-color: #181818;
+    }
+    .stSidebar .stButton>button {
+        background: linear-gradient(145deg, #1c1c1c, #252525);
+        color: white;
+        box-shadow: 2px 2px 5px #0a0a0a, -2px -2px 5px #333;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # Load Chat Sessions & Banned IPs
 def load_banned_ips():
@@ -62,21 +98,7 @@ def load_chats():
 def save_chats():
     pickle.dump(st.session_state.chat_sessions, open(CHAT_SESSIONS_FILE, "wb"))
 
-# Function to get user IP & check if banned
-def get_user_ip():
-    try:
-        response = requests.get("https://api64.ipify.org?format=json")
-        return response.json()["ip"]
-    except:
-        return "Unknown"
-
-user_ip = get_user_ip()
-banned_ips = load_banned_ips()
-if user_ip in banned_ips:
-    st.error("🚫 Your IP has been banned.")
-    st.stop()
-
-# Load all chat sessions
+# Ensure chat data exists
 if "chat_sessions" not in st.session_state:
     st.session_state.chat_sessions = load_chats()
 
@@ -106,24 +128,6 @@ if st.session_state.current_chat:
 else:
     chat_data = {"messages": [], "timestamps": []}  # Fallback to avoid errors
 
-# Chat Rename Option
-if st.session_state.current_chat:
-    new_chat_name = st.sidebar.text_input("✏️ Rename Chat", value=st.session_state.current_chat)
-    if st.sidebar.button("✅ Save Name"):
-        if new_chat_name and new_chat_name not in st.session_state.chat_sessions:
-            st.session_state.chat_sessions[new_chat_name] = st.session_state.chat_sessions.pop(st.session_state.current_chat)
-            st.session_state.current_chat = new_chat_name
-            save_chats()
-            st.rerun()
-
-# Chat Delete Option
-if st.session_state.current_chat:
-    if st.sidebar.button("🗑️ Delete Chat"):
-        del st.session_state.chat_sessions[st.session_state.current_chat]
-        st.session_state.current_chat = chat_names[0] if chat_names else None
-        save_chats()
-        st.rerun()
-
 # AI Chatbot Initialization
 chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
 
@@ -145,33 +149,27 @@ if user_input:
 
     save_chats()
 
-# Function to Export Chat as a Properly Formatted PDF
-# Function to Export Chat as a Properly Formatted PDF
+# Export Chat as PDF with Better Formatting
 def export_pdf(chat_data):
     pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)  # Prevents text cutoff
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("Arial", style='', size=12)
+    pdf.set_font("Arial", size=12)
 
     pdf.cell(200, 10, "Chat History", ln=True, align="C")
-    pdf.ln(5)  # Adds a little space
+    pdf.ln(5)
 
     for role, msg in zip(["User", "AI"] * (len(chat_data["messages"]) // 2), chat_data["messages"]):
-        pdf.set_font("Arial", style='B', size=12)  # Bold for roles
+        pdf.set_font("Arial", style='B', size=12)
         pdf.cell(0, 8, f"{role}:", ln=True)  
-
-        pdf.set_font("Arial", size=11)  # Regular font for messages
+        pdf.set_font("Arial", size=11)
         clean_text = msg.content.replace("**", "")  # Remove Markdown Bold Symbols
-        clean_text_1 = msg.content.replace("*", "") # Remove Markdown Bold Symbols
         pdf.multi_cell(0, 7, clean_text)  # Wraps long messages
-        pdf.multi_cell(0, 7, clean_text_1)  # Wraps long messages
-        pdf.ln(3)  # Adds space between messages
+        pdf.ln(3)
 
-    # Save the PDF as a file
     pdf_file_path = "chat_history.pdf"
     pdf.output(pdf_file_path)
-
-    return pdf_file_path  # Return file path for download
+    return pdf_file_path
 
 # Button to Export Chat as PDF
 if st.sidebar.button("📥 Export as PDF"):
@@ -184,4 +182,4 @@ if st.sidebar.button("📥 Export as PDF"):
 for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
-        st.markdown(f"**[{timestamp}]** {msg.content}")
+        st.markdown(f"[{timestamp}] {msg.content}")
