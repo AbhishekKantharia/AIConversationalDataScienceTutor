@@ -21,13 +21,21 @@ CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 BANNED_IPS_FILE = "banned_ips.pkl"
 LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 
-# Streamlit Page Config (Dark Mode Only)
+# Streamlit Page Config
 st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
 
-# Apply Full Dark Mode Theme
-st.markdown(
-    """
-    <style>
+# Sidebar - Toggle for Dark Mode
+st.sidebar.header("⚙️ Settings")
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False  # Default to light mode
+
+st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
+
+# Apply Dark/Light Mode Styling
+if st.session_state.dark_mode:
+    st.markdown(
+        """
+        <style>
         body { background-color: #121212; color: #e0e0e0; }
         .stApp { background-color: #121212; }
         .stButton>button { background-color: #333; color: white; border-radius: 10px; }
@@ -35,10 +43,10 @@ st.markdown(
         .stSidebar { background-color: #181818; }
         .stSidebar .stButton>button { background-color: #333; color: white; }
         .stSidebar .stTextInput>div>div>input { background-color: #222; color: white; border: 1px solid #555; }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 # Function to get the user's IP address
 def get_user_ip():
