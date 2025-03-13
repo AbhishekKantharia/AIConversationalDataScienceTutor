@@ -154,6 +154,18 @@ if st.session_state.pdf_export:
             st.sidebar.download_button(label="⬇️ Download PDF", data=f, file_name="chat_history.pdf", mime="application/pdf")
             st.sidebar.success("✅ PDF is ready for download!")
 
+# Ensure chat_data is properly initialized
+if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chat_sessions:
+    if st.session_state.multi_chat:
+        chat_names = list(st.session_state.chat_sessions.keys())
+        st.session_state.current_chat = chat_names[0] if chat_names else None
+
+# Initialize chat_data safely
+if st.session_state.current_chat and st.session_state.multi_chat:
+    chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
+else:
+    chat_data = {"messages": [], "timestamps": []}  # Fallback if multi-chat is disabled
+
 # Display Chat Messages
 for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
