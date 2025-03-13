@@ -155,10 +155,43 @@ if st.session_state.pdf_export:
             st.sidebar.success("✅ PDF is ready for download!")
 
 # Ensure chat_data is properly initialized
-if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chat_sessions:
-    if st.session_state.multi_chat:
-        chat_names = list(st.session_state.chat_sessions.keys())
-        st.session_state.current_chat = chat_names[0] if chat_names else None
+# Ensure chat_sessions is initialized
+if "chat_sessions" not in st.session_state:
+    st.session_state.chat_sessions = {}
+
+# Ensure current_chat is initialized
+if "current_chat" not in st.session_state:
+    st.session_state.current_chat = None
+
+# Multi-Chat Support (if enabled)
+if st.session_state.multi_chat:
+    st.sidebar.header("📂 Chat Sessions")
+
+    if st.sidebar.button("➕ New Chat"):
+        new_chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
+        st.session_state.chat_sessions[new_chat_id] = {"messages": [], "timestamps": []}
+        st.session_state.current_chat = new_chat_id
+
+    chat_names = list(st.session_state.chat_sessions.keys())
+    if chat_names:
+        selected_chat = st.sidebar.radio("💬 Select a Chat", chat_names)
+        st.session_state.current_chat = selected_chat
+
+    if st.session_state.current_chat is None and chat_names:
+        st.session_state.current_chat = chat_names[0]
+
+# Ensure chat_data is always available
+if st.session_state.current_chat:
+    chat_data = st.session_state.chat_sessions.get(st.session_state.current_chat, {"messages": [], "timestamps": []})
+else:
+    chat_data = {"messages": [], "timestamps": []}  # Default if no chat exists
+
+# Ensure chat_data is always available
+if st.session_state.current_chat:
+    chat_data = st.session_state.chat_sessions.get(st.session_state.current_chat, {"messages": [], "timestamps": []})
+else:
+    chat_data = {"messages": [], "timestamps": []}  # Default if no chat exists
+
 
 # Initialize chat_data safely
 if st.session_state.current_chat and st.session_state.multi_chat:
