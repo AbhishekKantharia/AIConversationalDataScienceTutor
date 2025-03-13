@@ -110,6 +110,15 @@ if st.session_state.multi_chat:
     if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chat_sessions:
         st.session_state.current_chat = chat_names[0] if chat_names else None
 
+    # Delete Chat Option
+    if st.session_state.current_chat:
+        if st.sidebar.button("🗑️ Delete Chat"):
+            del st.session_state.chat_sessions[st.session_state.current_chat]
+            chat_names = list(st.session_state.chat_sessions.keys())  
+            st.session_state.current_chat = chat_names[0] if chat_names else None
+            save_chats()
+            st.experimental_rerun()
+
 # Ensure chat_data is properly initialized
 if st.session_state.current_chat:
     chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
@@ -136,42 +145,6 @@ if user_input:
     chat_data["timestamps"].insert(1, timestamp)
 
     save_chats()
-
-# AI Summarization (if enabled)
-if st.session_state.chat_summarization:
-    if st.sidebar.button("🧠 Summarize Chat"):
-        summary_prompt = "Summarize the following chat conversation:\n\n" + "\n".join([msg.content for msg in chat_data["messages"]])
-        summary_response = chat_model.invoke(summary_prompt)
-        st.sidebar.write(f"**📌 Summary:** {summary_response.content}")
-
-# PDF Export (if enabled)
-if st.session_state.pdf_export:
-    def export_pdf(chat_data):
-        pdf = FPDF()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-
-        pdf.cell(200, 10, "Chat History", ln=True, align="C")
-        pdf.ln(5)
-
-        for role, msg in zip(["User", "AI"] * (len(chat_data["messages"]) // 2), chat_data["messages"]):
-            pdf.set_font("Arial", style='B', size=12)
-            pdf.cell(0, 8, f"{role}:", ln=True)  
-            pdf.set_font("Arial", size=11)
-            clean_text = msg.content.replace("**", "")
-            pdf.multi_cell(0, 7, clean_text)
-            pdf.ln(3)
-
-        pdf_file_path = "chat_history.pdf"
-        pdf.output(pdf_file_path)
-        return pdf_file_path
-
-    if st.sidebar.button("📥 Export as PDF"):
-        pdf_path = export_pdf(chat_data)
-        with open(pdf_path, "rb") as f:
-            st.sidebar.download_button(label="⬇️ Download PDF", data=f, file_name="chat_history.pdf", mime="application/pdf")
-            st.sidebar.success("✅ PDF is ready for download!")
 
 # Display Chat Messages
 for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
