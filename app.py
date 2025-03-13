@@ -1,6 +1,7 @@
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import AIMessage, HumanMessage
+from langchain.memory import ConversationBufferMemory  # Memory Support
 import google.generativeai as genai
 import datetime
 import os
@@ -8,6 +9,7 @@ import pickle
 import requests
 from dotenv import load_dotenv  # Secure password storage
 from fpdf import FPDF  # PDF Export
+import time  # For real-time streaming
 
 # Load environment variables securely
 load_dotenv()
@@ -19,41 +21,35 @@ genai.configure(api_key=GOOGLE_API_KEY)
 
 # File Paths
 CHAT_SESSIONS_FILE = "chat_sessions.pkl"
-BANNED_IPS_FILE = "banned_ips.pkl"
 LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 
 # Streamlit Page Config
 st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
 
 # Sidebar - Feature Toggles
-st.sidebar.header("⚙️ Toggle Features")
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = False
-if "multi_chat" not in st.session_state:
-    st.session_state.multi_chat = True
-if "pdf_export" not in st.session_state:
-    st.session_state.pdf_export = True
-if "chat_summarization" not in st.session_state:
-    st.session_state.chat_summarization = True
-if "ip_banning" not in st.session_state:
-    st.session_state.ip_banning = True
+st.sidebar.header("⚙️ Live Feature Toggles")
+feature_settings = ["dark_mode", "multi_chat", "pdf_export", "chat_summarization", "memory_enabled"]
+default_values = [False, True, True, True, True]
 
-# Toggle buttons
+# Initialize session state for toggles
+for feature, default in zip(feature_settings, default_values):
+    if feature not in st.session_state:
+        st.session_state[feature] = default
+
+# Live Toggle Buttons (Update Immediately)
 st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
-st.session_state.multi_chat = st.sidebar.toggle("💬 Enable Multi-Chat", value=st.session_state.multi_chat)
-st.session_state.pdf_export = st.sidebar.toggle("📜 Enable PDF Export", value=st.session_state.pdf_export)
-st.session_state.chat_summarization = st.sidebar.toggle("🧠 Enable AI Summarization", value=st.session_state.chat_summarization)
-st.session_state.ip_banning = st.sidebar.toggle("🔐 Enable IP Banning", value=st.session_state.ip_banning)
+st.session_state.multi_chat = st.sidebar.toggle("💬 Multi-Chat", value=st.session_state.multi_chat)
+st.session_state.pdf_export = st.sidebar.toggle("📜 PDF Export", value=st.session_state.pdf_export)
+st.session_state.chat_summarization = st.sidebar.toggle("🧠 AI Summarization", value=st.session_state.chat_summarization)
+st.session_state.memory_enabled = st.sidebar.toggle("🔁 Enable Memory", value=st.session_state.memory_enabled)
 
-# Apply 3D Styling with CSS
+# Apply 3D Styling with Live Theme Updates
 st.markdown(
-    """
+    f"""
     <style>
-    body { background-color: #121212; color: #e0e0e0; }
-    .stApp { background-color: #121212; }
-
-    /* 3D Buttons */
-    .stButton>button {
+    body {{ background-color: {'#121212' if st.session_state.dark_mode else '#ffffff'}; color: {'#e0e0e0' if st.session_state.dark_mode else '#000000'}; }}
+    .stApp {{ background-color: {'#121212' if st.session_state.dark_mode else '#ffffff'}; }}
+    .stButton>button {{
         background: linear-gradient(145deg, #1f1f1f, #292929);
         color: white;
         border: none;
@@ -61,48 +57,33 @@ st.markdown(
         box-shadow: 4px 4px 8px #0a0a0a, -4px -4px 8px #333;
         padding: 12px 24px;
         transition: 0.2s;
-    }
-    .stButton>button:hover {
+    }}
+    .stButton>button:hover {{
         transform: scale(1.07);
         box-shadow: 5px 5px 10px #000000, -5px -5px 10px #444;
-    }
-
-    /* 3D Chat Bubbles */
-    .stChatMessage {
+    }}
+    .stChatMessage {{
         background: linear-gradient(145deg, #1e1e1e, #252525);
         padding: 15px;
         border-radius: 12px;
         box-shadow: 4px 4px 8px #0a0a0a, -4px -4px 8px #333;
         margin-bottom: 10px;
-    }
-
-    /* 3D Inputs */
-    .stTextInput>div>div>input {
+    }}
+    .stTextInput>div>div>input {{
         background: #222;
         color: white;
         border: 2px solid #555;
         border-radius: 10px;
         padding: 12px;
-        transition: 0.2s;
-    }
-    .stTextInput>div>div>input:focus {
-        border-color: #888;
-        box-shadow: 0px 0px 7px #888;
-    }
-
-    /* Sidebar */
-    .stSidebar {
-        background-color: #181818;
-    }
-    .stSidebar .stButton>button {
-        background: linear-gradient(145deg, #1c1c1c, #252525);
-        color: white;
-        box-shadow: 3px 3px 6px #0a0a0a, -3px -3px 6px #333;
-    }
+    }}
     </style>
     """,
     unsafe_allow_html=True
 )
+
+# Initialize memory if enabled
+if "memory" not in st.session_state:
+    st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
 # Ensure chat_sessions is initialized
 if "chat_sessions" not in st.session_state:
@@ -148,7 +129,7 @@ if st.session_state.multi_chat:
 # Ensure chat_data exists
 chat_data = st.session_state.chat_sessions.get(st.session_state.current_chat, {"messages": [], "timestamps": []})
 
-# AI Chatbot
+# AI Chatbot with Real-Time Streaming & Memory Toggle
 chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
 user_input = st.chat_input("Ask a Data Science question...")
 
@@ -156,12 +137,32 @@ if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     chat_data["messages"].insert(0, HumanMessage(content=user_input))
     chat_data["timestamps"].insert(0, timestamp)
-    response = chat_model.invoke([HumanMessage(content=user_input)])
-    chat_data["messages"].insert(1, AIMessage(content=response.content))
+
+    with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+        response_text = ""
+
+        # Retrieve chat history if memory is enabled
+        chat_history = st.session_state.memory.load_memory_variables({})["chat_history"] if st.session_state.memory_enabled else []
+
+        # Generate AI Response
+        response = chat_model.invoke(chat_history + [HumanMessage(content=user_input)]).content
+
+        # Store conversation in memory if enabled
+        if st.session_state.memory_enabled:
+            st.session_state.memory.save_context({"input": user_input}, {"output": response})
+
+        # Simulate real-time streaming output
+        for word in response.split():
+            response_text += word + " "
+            time.sleep(0.04)  # Simulate typing effect
+            response_placeholder.markdown(response_text)
+
+    chat_data["messages"].insert(1, AIMessage(content=response))
     chat_data["timestamps"].insert(1, timestamp)
 
 # Display Chat Messages
 for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
-        st.markdown(f"[{timestamp}] {msg.content}")
+        st.markdown(f"**[{timestamp}]** {msg.content}")
