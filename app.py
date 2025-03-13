@@ -145,19 +145,28 @@ if user_input:
 
     save_chats()
 
-# Export Chat as PDF
+# Export Chat as PDF and Create a Download Button
 def export_pdf(chat_data):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, "Chat History", ln=True, align="C")
+
     for role, msg in zip(["User", "AI"] * (len(chat_data["messages"]) // 2), chat_data["messages"]):
         pdf.cell(200, 10, f"{role}: {msg.content}", ln=True)
-    pdf.output("chat_history.pdf")
 
+    # Save the PDF as a file
+    pdf_file_path = "chat_history.pdf"
+    pdf.output(pdf_file_path)
+
+    return pdf_file_path  # Return file path for download
+
+# Button to Export Chat as PDF
 if st.sidebar.button("📥 Export as PDF"):
-    export_pdf(chat_data)
-    st.sidebar.success("✅ Chat exported as PDF!")
+    pdf_path = export_pdf(chat_data)
+    with open(pdf_path, "rb") as f:
+        st.sidebar.download_button(label="⬇️ Download PDF", data=f, file_name="chat_history.pdf", mime="application/pdf")
+        st.sidebar.success("✅ PDF is ready for download!")
 
 # Display Chat Messages
 for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
