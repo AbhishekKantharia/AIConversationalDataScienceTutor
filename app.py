@@ -45,76 +45,64 @@ st.session_state.pdf_export = st.sidebar.toggle("📜 Enable PDF Export", value=
 st.session_state.chat_summarization = st.sidebar.toggle("🧠 Enable AI Summarization", value=st.session_state.chat_summarization)
 st.session_state.ip_banning = st.sidebar.toggle("🔐 Enable IP Banning", value=st.session_state.ip_banning)
 
-# Apply Dark/Light Mode Styling
-if st.session_state.dark_mode:
-    st.markdown(
-        """
-        <style>
-        body { background-color: #121212; color: #e0e0e0; }
-        .stApp { background-color: #121212; }
-        .stButton>button { background: linear-gradient(145deg, #1f1f1f, #292929); color: white; border-radius: 10px; }
-        .stChatMessage { background: linear-gradient(145deg, #1e1e1e, #252525); padding: 12px; border-radius: 10px; }
-        .stTextInput>div>div>input { background: #222; color: white; border: 1px solid #555; }
-        .stSidebar { background-color: #181818; }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+# Apply 3D Styling with CSS
+st.markdown(
+    """
+    <style>
+    body { background-color: #121212; color: #e0e0e0; }
+    .stApp { background-color: #121212; }
 
-# Load Chat Sessions & Banned IPs
-def load_banned_ips():
-    return pickle.load(open(BANNED_IPS_FILE, "rb")) if os.path.exists(BANNED_IPS_FILE) else set()
+    /* 3D Buttons */
+    .stButton>button {
+        background: linear-gradient(145deg, #1f1f1f, #292929);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        box-shadow: 4px 4px 8px #0a0a0a, -4px -4px 8px #333;
+        padding: 12px 24px;
+        transition: 0.2s;
+    }
+    .stButton>button:hover {
+        transform: scale(1.07);
+        box-shadow: 5px 5px 10px #000000, -5px -5px 10px #444;
+    }
 
-def save_banned_ips(banned_ips):
-    pickle.dump(banned_ips, open(BANNED_IPS_FILE, "wb"))
+    /* 3D Chat Bubbles */
+    .stChatMessage {
+        background: linear-gradient(145deg, #1e1e1e, #252525);
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 4px 4px 8px #0a0a0a, -4px -4px 8px #333;
+        margin-bottom: 10px;
+    }
 
-def load_chats():
-    return pickle.load(open(CHAT_SESSIONS_FILE, "rb")) if os.path.exists(CHAT_SESSIONS_FILE) else {}
+    /* 3D Inputs */
+    .stTextInput>div>div>input {
+        background: #222;
+        color: white;
+        border: 2px solid #555;
+        border-radius: 10px;
+        padding: 12px;
+        transition: 0.2s;
+    }
+    .stTextInput>div>div>input:focus {
+        border-color: #888;
+        box-shadow: 0px 0px 7px #888;
+    }
 
-def save_chats():
-    pickle.dump(st.session_state.chat_sessions, open(CHAT_SESSIONS_FILE, "wb"))
-
-# IP Banning (if enabled)
-if st.session_state.ip_banning:
-    def get_user_ip():
-        try:
-            response = requests.get("https://api64.ipify.org?format=json")
-            return response.json()["ip"]
-        except:
-            return "Unknown"
-
-    user_ip = get_user_ip()
-    banned_ips = load_banned_ips()
-    if user_ip in banned_ips:
-        st.error("🚫 Your IP has been banned.")
-        st.stop()
-
-# Multi-Chat Support (if enabled)
-if st.session_state.multi_chat:
-    if "chat_sessions" not in st.session_state:
-        st.session_state.chat_sessions = load_chats()
-
-    st.sidebar.header("📂 Chat Sessions")
-
-    if st.sidebar.button("➕ New Chat"):
-        new_chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
-        st.session_state.chat_sessions[new_chat_id] = {"messages": [], "timestamps": []}
-        st.session_state.current_chat = new_chat_id
-        save_chats()
-
-    chat_names = list(st.session_state.chat_sessions.keys())
-    if chat_names:
-        selected_chat = st.sidebar.radio("💬 Select a Chat", chat_names)
-        st.session_state.current_chat = selected_chat
-
-    if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chat_sessions:
-        st.session_state.current_chat = chat_names[0] if chat_names else None
-
-# Ensure chat_data is properly initialized
-if st.session_state.current_chat:
-    chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
-else:
-    chat_data = {"messages": [], "timestamps": []}
+    /* Sidebar */
+    .stSidebar {
+        background-color: #181818;
+    }
+    .stSidebar .stButton>button {
+        background: linear-gradient(145deg, #1c1c1c, #252525);
+        color: white;
+        box-shadow: 3px 3px 6px #0a0a0a, -3px -3px 6px #333;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # AI Chatbot Initialization
 chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
@@ -137,14 +125,7 @@ if user_input:
 
     save_chats()
 
-# AI Summarization (if enabled)
-if st.session_state.chat_summarization:
-    if st.sidebar.button("🧠 Summarize Chat"):
-        summary_prompt = "Summarize the following chat conversation:\n\n" + "\n".join([msg.content for msg in chat_data["messages"]])
-        summary_response = chat_model.invoke(summary_prompt)
-        st.sidebar.write(f"**📌 Summary:** {summary_response.content}")
-
-# PDF Export (if enabled)
+# Export Chat as PDF (if enabled)
 if st.session_state.pdf_export:
     def export_pdf(chat_data):
         pdf = FPDF()
