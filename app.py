@@ -25,65 +25,41 @@ LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 # Streamlit Page Config
 st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
 
-# Custom 3D Styling with CSS
-st.markdown(
-    """
-    <style>
-    body { background-color: #121212; color: #e0e0e0; }
-    .stApp { background-color: #121212; }
-    
-    /* 3D Buttons */
-    .stButton>button {
-        background: linear-gradient(145deg, #1f1f1f, #292929);
-        color: white;
-        border: none;
-        border-radius: 10px;
-        box-shadow: 3px 3px 6px #0a0a0a, -3px -3px 6px #333;
-        padding: 10px 20px;
-        transition: 0.2s;
-    }
-    .stButton>button:hover {
-        transform: scale(1.05);
-        box-shadow: 4px 4px 8px #000000, -4px -4px 8px #444;
-    }
+# Sidebar - Feature Toggles
+st.sidebar.header("⚙️ Toggle Features")
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+if "multi_chat" not in st.session_state:
+    st.session_state.multi_chat = True
+if "pdf_export" not in st.session_state:
+    st.session_state.pdf_export = True
+if "chat_summarization" not in st.session_state:
+    st.session_state.chat_summarization = True
+if "ip_banning" not in st.session_state:
+    st.session_state.ip_banning = True
 
-    /* Chat bubbles */
-    .stChatMessage {
-        background: linear-gradient(145deg, #1e1e1e, #252525);
-        padding: 12px;
-        border-radius: 10px;
-        box-shadow: 3px 3px 5px #0a0a0a, -3px -3px 5px #333;
-        margin-bottom: 10px;
-    }
+# Toggle buttons
+st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
+st.session_state.multi_chat = st.sidebar.toggle("💬 Enable Multi-Chat", value=st.session_state.multi_chat)
+st.session_state.pdf_export = st.sidebar.toggle("📜 Enable PDF Export", value=st.session_state.pdf_export)
+st.session_state.chat_summarization = st.sidebar.toggle("🧠 Enable AI Summarization", value=st.session_state.chat_summarization)
+st.session_state.ip_banning = st.sidebar.toggle("🔐 Enable IP Banning", value=st.session_state.ip_banning)
 
-    /* Inputs */
-    .stTextInput>div>div>input {
-        background: #222;
-        color: white;
-        border: 2px solid #444;
-        border-radius: 8px;
-        padding: 10px;
-        transition: 0.2s;
-    }
-    .stTextInput>div>div>input:focus {
-        border-color: #888;
-        box-shadow: 0px 0px 5px #888;
-    }
-
-    /* Sidebar */
-    .stSidebar {
-        background-color: #181818;
-    }
-    .stSidebar .stButton>button {
-        background: linear-gradient(145deg, #1c1c1c, #252525);
-        color: white;
-        box-shadow: 2px 2px 5px #0a0a0a, -2px -2px 5px #333;
-    }
-
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# Apply Dark/Light Mode Styling
+if st.session_state.dark_mode:
+    st.markdown(
+        """
+        <style>
+        body { background-color: #121212; color: #e0e0e0; }
+        .stApp { background-color: #121212; }
+        .stButton>button { background: linear-gradient(145deg, #1f1f1f, #292929); color: white; border-radius: 10px; }
+        .stChatMessage { background: linear-gradient(145deg, #1e1e1e, #252525); padding: 12px; border-radius: 10px; }
+        .stTextInput>div>div>input { background: #222; color: white; border: 1px solid #555; }
+        .stSidebar { background-color: #181818; }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 # Load Chat Sessions & Banned IPs
 def load_banned_ips():
@@ -98,35 +74,47 @@ def load_chats():
 def save_chats():
     pickle.dump(st.session_state.chat_sessions, open(CHAT_SESSIONS_FILE, "wb"))
 
-# Ensure chat data exists
-if "chat_sessions" not in st.session_state:
-    st.session_state.chat_sessions = load_chats()
+# IP Banning (if enabled)
+if st.session_state.ip_banning:
+    def get_user_ip():
+        try:
+            response = requests.get("https://api64.ipify.org?format=json")
+            return response.json()["ip"]
+        except:
+            return "Unknown"
 
-# Sidebar - Chat Management
-st.sidebar.header("📂 Chat Sessions")
+    user_ip = get_user_ip()
+    banned_ips = load_banned_ips()
+    if user_ip in banned_ips:
+        st.error("🚫 Your IP has been banned.")
+        st.stop()
 
-if st.sidebar.button("➕ New Chat"):
-    new_chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
-    st.session_state.chat_sessions[new_chat_id] = {"messages": [], "timestamps": []}
-    st.session_state.current_chat = new_chat_id
-    save_chats()
+# Multi-Chat Support (if enabled)
+if st.session_state.multi_chat:
+    if "chat_sessions" not in st.session_state:
+        st.session_state.chat_sessions = load_chats()
 
-chat_names = list(st.session_state.chat_sessions.keys())
-if chat_names:
-    selected_chat = st.sidebar.radio("💬 Select a Chat", chat_names)
-    st.session_state.current_chat = selected_chat
+    st.sidebar.header("📂 Chat Sessions")
 
-if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chat_sessions:
+    if st.sidebar.button("➕ New Chat"):
+        new_chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
+        st.session_state.chat_sessions[new_chat_id] = {"messages": [], "timestamps": []}
+        st.session_state.current_chat = new_chat_id
+        save_chats()
+
+    chat_names = list(st.session_state.chat_sessions.keys())
     if chat_names:
-        st.session_state.current_chat = chat_names[0]
-    else:
-        st.session_state.current_chat = None
+        selected_chat = st.sidebar.radio("💬 Select a Chat", chat_names)
+        st.session_state.current_chat = selected_chat
+
+    if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chat_sessions:
+        st.session_state.current_chat = chat_names[0] if chat_names else None
 
 # Ensure chat_data is properly initialized
 if st.session_state.current_chat:
     chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
 else:
-    chat_data = {"messages": [], "timestamps": []}  # Fallback to avoid errors
+    chat_data = {"messages": [], "timestamps": []}
 
 # AI Chatbot Initialization
 chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
@@ -149,34 +137,41 @@ if user_input:
 
     save_chats()
 
-# Export Chat as PDF with Better Formatting
-def export_pdf(chat_data):
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
+# AI Summarization (if enabled)
+if st.session_state.chat_summarization:
+    if st.sidebar.button("🧠 Summarize Chat"):
+        summary_prompt = "Summarize the following chat conversation:\n\n" + "\n".join([msg.content for msg in chat_data["messages"]])
+        summary_response = chat_model.invoke(summary_prompt)
+        st.sidebar.write(f"**📌 Summary:** {summary_response.content}")
 
-    pdf.cell(200, 10, "Chat History", ln=True, align="C")
-    pdf.ln(5)
+# PDF Export (if enabled)
+if st.session_state.pdf_export:
+    def export_pdf(chat_data):
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
 
-    for role, msg in zip(["User", "AI"] * (len(chat_data["messages"]) // 2), chat_data["messages"]):
-        pdf.set_font("Arial", style='B', size=12)
-        pdf.cell(0, 8, f"{role}:", ln=True)  
-        pdf.set_font("Arial", size=11)
-        clean_text = msg.content.replace("**", "")  # Remove Markdown Bold Symbols
-        pdf.multi_cell(0, 7, clean_text)  # Wraps long messages
-        pdf.ln(3)
+        pdf.cell(200, 10, "Chat History", ln=True, align="C")
+        pdf.ln(5)
 
-    pdf_file_path = "chat_history.pdf"
-    pdf.output(pdf_file_path)
-    return pdf_file_path
+        for role, msg in zip(["User", "AI"] * (len(chat_data["messages"]) // 2), chat_data["messages"]):
+            pdf.set_font("Arial", style='B', size=12)
+            pdf.cell(0, 8, f"{role}:", ln=True)  
+            pdf.set_font("Arial", size=11)
+            clean_text = msg.content.replace("**", "")
+            pdf.multi_cell(0, 7, clean_text)
+            pdf.ln(3)
 
-# Button to Export Chat as PDF
-if st.sidebar.button("📥 Export as PDF"):
-    pdf_path = export_pdf(chat_data)
-    with open(pdf_path, "rb") as f:
-        st.sidebar.download_button(label="⬇️ Download PDF", data=f, file_name="chat_history.pdf", mime="application/pdf")
-        st.sidebar.success("✅ PDF is ready for download!")
+        pdf_file_path = "chat_history.pdf"
+        pdf.output(pdf_file_path)
+        return pdf_file_path
+
+    if st.sidebar.button("📥 Export as PDF"):
+        pdf_path = export_pdf(chat_data)
+        with open(pdf_path, "rb") as f:
+            st.sidebar.download_button(label="⬇️ Download PDF", data=f, file_name="chat_history.pdf", mime="application/pdf")
+            st.sidebar.success("✅ PDF is ready for download!")
 
 # Display Chat Messages
 for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
