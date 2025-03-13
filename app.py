@@ -16,9 +16,6 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 # Configure Google Gemini API
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# File Paths
-LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
-
 # Streamlit Page Config
 st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
 
@@ -52,7 +49,7 @@ if "current_chat" not in st.session_state:
     st.session_state.chat_sessions[st.session_state.current_chat] = {"messages": [], "timestamps": []}
 
 # AI Chatbot with Real-Time Streaming & Memory Toggle
-chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
+chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest")
 user_input = st.chat_input("Ask a Data Science question...")
 
 if user_input:
@@ -72,18 +69,28 @@ if user_input:
     st.session_state.chat_sessions[st.session_state.current_chat]["messages"].append(HumanMessage(content=user_input))
     st.session_state.chat_sessions[st.session_state.current_chat]["timestamps"].append(timestamp)
 
+    # **Format AI Response - Eliminating `##` and Enhancing Readability**
+    formatted_response = f"""
+    **🧠 Answer:** {response.split(".")[0]}.  
+
+    **📌 Key Points:**  
+    - {'. '.join(response.split('.')[1:]) if len(response.split('.')) > 1 else 'No additional details available.'}  
+
+    **💡 Additional Notes:** AI-generated structured response for better clarity.
+    """
+
     # Display AI Response **(only one per prompt)**
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         response_text = ""
 
-        for word in response.split():
+        for word in formatted_response.split():
             response_text += word + " "
             time.sleep(0.04)  # Simulate typing effect
             response_placeholder.markdown(response_text)
 
     # Append AI Message (only one response per prompt)
-    st.session_state.chat_sessions[st.session_state.current_chat]["messages"].append(AIMessage(content=response))
+    st.session_state.chat_sessions[st.session_state.current_chat]["messages"].append(AIMessage(content=formatted_response))
     st.session_state.chat_sessions[st.session_state.current_chat]["timestamps"].append(timestamp)
 
 # Display Chat Messages (Only One AI Response per Prompt)
