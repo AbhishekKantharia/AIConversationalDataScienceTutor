@@ -145,15 +145,23 @@ if user_input:
 
     save_chats()
 
-# Export Chat as PDF and Create a Download Button
+# Function to Export Chat as a Properly Formatted PDF
 def export_pdf(chat_data):
     pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)  # Prevents text cutoff
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
+    pdf.set_font("Arial", style='', size=12)
+
     pdf.cell(200, 10, "Chat History", ln=True, align="C")
+    pdf.ln(5)  # Adds a little space
 
     for role, msg in zip(["User", "AI"] * (len(chat_data["messages"]) // 2), chat_data["messages"]):
-        pdf.cell(200, 10, f"{role}: {msg.content}", ln=True)
+        pdf.set_font("Arial", style='B', size=12)  # Bold for roles
+        pdf.cell(0, 8, f"{role}:", ln=True)  
+
+        pdf.set_font("Arial", size=11)  # Regular font for messages
+        pdf.multi_cell(0, 7, msg.content)  # Wraps long messages
+        pdf.ln(3)  # Adds space between messages
 
     # Save the PDF as a file
     pdf_file_path = "chat_history.pdf"
