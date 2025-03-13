@@ -21,26 +21,24 @@ CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 BANNED_IPS_FILE = "banned_ips.pkl"
 LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 
-# Streamlit Page Config
+# Streamlit Page Config (Dark Mode Only)
 st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
 
-# Sidebar - Dark Mode Toggle
-st.sidebar.header("⚙️ Settings")
-dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=False)
-theme = "dark" if dark_mode else "light"
-
-# Apply Dark/Light Mode Styling
-if dark_mode:
-    st.markdown(
-        """
-        <style>
-        body { background-color: #121212; color: white; }
-        .stButton>button { background-color: #333; color: white; }
-        .stTextInput>div>div>input { background-color: #333; color: white; }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+# Apply Full Dark Mode Theme
+st.markdown(
+    """
+    <style>
+        body { background-color: #121212; color: #e0e0e0; }
+        .stApp { background-color: #121212; }
+        .stButton>button { background-color: #333; color: white; border-radius: 10px; }
+        .stTextInput>div>div>input { background-color: #222; color: white; border: 1px solid #555; }
+        .stSidebar { background-color: #181818; }
+        .stSidebar .stButton>button { background-color: #333; color: white; }
+        .stSidebar .stTextInput>div>div>input { background-color: #222; color: white; border: 1px solid #555; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # Function to get the user's IP address
 def get_user_ip():
@@ -141,7 +139,7 @@ else:
 chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
 
 # User Input
-user_input = st.chat_input("Ask me a Data Science question...")
+user_input = st.chat_input("Ask a Data Science question...")
 
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
