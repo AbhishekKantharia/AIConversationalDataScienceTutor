@@ -5,11 +5,8 @@ from langchain.memory import ConversationBufferMemory  # Memory Support
 import google.generativeai as genai
 import datetime
 import os
-import pickle
-import requests
-from dotenv import load_dotenv  # Secure password storage
-from fpdf import FPDF  # PDF Export
 import time  # For real-time streaming
+from dotenv import load_dotenv  # Secure password storage
 
 # Load environment variables securely
 load_dotenv()
@@ -20,7 +17,6 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # File Paths
-CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 
 # Streamlit Page Config
@@ -28,20 +24,8 @@ st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout=
 
 # Sidebar - Feature Toggles
 st.sidebar.header("⚙️ Live Feature Toggles")
-feature_settings = ["dark_mode", "multi_chat", "pdf_export", "chat_summarization", "memory_enabled"]
-default_values = [False, True, True, True, True]
-
-# Initialize session state for toggles
-for feature, default in zip(feature_settings, default_values):
-    if feature not in st.session_state:
-        st.session_state[feature] = default
-
-# Live Toggle Buttons (Update Immediately)
-st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
-st.session_state.multi_chat = st.sidebar.toggle("💬 Multi-Chat", value=st.session_state.multi_chat)
-st.session_state.pdf_export = st.sidebar.toggle("📜 PDF Export", value=st.session_state.pdf_export)
-st.session_state.chat_summarization = st.sidebar.toggle("🧠 AI Summarization", value=st.session_state.chat_summarization)
-st.session_state.memory_enabled = st.sidebar.toggle("🔁 Enable Memory", value=st.session_state.memory_enabled)
+st.session_state.memory_enabled = st.sidebar.toggle("🔁 Enable Memory", value=True)
+st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=False)
 
 # Apply 3D Styling with Live Theme Updates
 st.markdown(
@@ -49,33 +33,6 @@ st.markdown(
     <style>
     body {{ background-color: {'#121212' if st.session_state.dark_mode else '#ffffff'}; color: {'#e0e0e0' if st.session_state.dark_mode else '#000000'}; }}
     .stApp {{ background-color: {'#121212' if st.session_state.dark_mode else '#ffffff'}; }}
-    .stButton>button {{
-        background: linear-gradient(145deg, #1f1f1f, #292929);
-        color: white;
-        border: none;
-        border-radius: 12px;
-        box-shadow: 4px 4px 8px #0a0a0a, -4px -4px 8px #333;
-        padding: 12px 24px;
-        transition: 0.2s;
-    }}
-    .stButton>button:hover {{
-        transform: scale(1.07);
-        box-shadow: 5px 5px 10px #000000, -5px -5px 10px #444;
-    }}
-    .stChatMessage {{
-        background: linear-gradient(145deg, #1e1e1e, #252525);
-        padding: 15px;
-        border-radius: 12px;
-        box-shadow: 4px 4px 8px #0a0a0a, -4px -4px 8px #333;
-        margin-bottom: 10px;
-    }}
-    .stTextInput>div>div>input {{
-        background: #222;
-        color: white;
-        border: 2px solid #555;
-        border-radius: 10px;
-        padding: 12px;
-    }}
     </style>
     """,
     unsafe_allow_html=True
@@ -91,43 +48,8 @@ if "chat_sessions" not in st.session_state:
 
 # Ensure current_chat is initialized
 if "current_chat" not in st.session_state:
-    st.session_state.current_chat = None
-
-# Multi-Chat Support
-if st.session_state.multi_chat:
-    st.sidebar.header("📂 Chat Sessions")
-
-    if st.sidebar.button("➕ New Chat"):
-        new_chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
-        st.session_state.chat_sessions[new_chat_id] = {"messages": [], "timestamps": []}
-        st.session_state.current_chat = new_chat_id
-
-    chat_names = list(st.session_state.chat_sessions.keys())
-    if chat_names:
-        selected_chat = st.sidebar.radio("💬 Select a Chat", chat_names)
-        st.session_state.current_chat = selected_chat
-
-    if st.session_state.current_chat is None and chat_names:
-        st.session_state.current_chat = chat_names[0]
-
-    # ✏️ Rename Chat Option
-    if st.session_state.current_chat:
-        new_chat_name = st.sidebar.text_input("✏️ Rename Chat", value=st.session_state.current_chat)
-        if st.sidebar.button("✅ Save Name"):
-            if new_chat_name and new_chat_name not in st.session_state.chat_sessions:
-                st.session_state.chat_sessions[new_chat_name] = st.session_state.chat_sessions.pop(st.session_state.current_chat)
-                st.session_state.current_chat = new_chat_name
-
-    # 🗑️ Delete Chat Button
-    if st.session_state.current_chat:
-        if st.sidebar.button("🗑️ Delete Chat"):
-            del st.session_state.chat_sessions[st.session_state.current_chat]
-            chat_names = list(st.session_state.chat_sessions.keys())  
-            st.session_state.current_chat = chat_names[0] if chat_names else None
-            st.experimental_rerun()
-
-# Ensure chat_data exists
-chat_data = st.session_state.chat_sessions.get(st.session_state.current_chat, {"messages": [], "timestamps": []})
+    st.session_state.current_chat = "Chat 1"
+    st.session_state.chat_sessions[st.session_state.current_chat] = {"messages": [], "timestamps": []}
 
 # AI Chatbot with Real-Time Streaming & Memory Toggle
 chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
@@ -135,34 +57,40 @@ user_input = st.chat_input("Ask a Data Science question...")
 
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    chat_data["messages"].insert(0, HumanMessage(content=user_input))
-    chat_data["timestamps"].insert(0, timestamp)
+    
+    # Retrieve chat history if memory is enabled
+    chat_history = st.session_state.memory.load_memory_variables({})["chat_history"] if st.session_state.memory_enabled else []
 
+    # Generate AI Response **(only one response per prompt)**
+    response = chat_model.invoke(chat_history + [HumanMessage(content=user_input)]).content
+
+    # Store conversation in memory if enabled
+    if st.session_state.memory_enabled:
+        st.session_state.memory.save_context({"input": user_input}, {"output": response})
+
+    # Append User Message
+    st.session_state.chat_sessions[st.session_state.current_chat]["messages"].append(HumanMessage(content=user_input))
+    st.session_state.chat_sessions[st.session_state.current_chat]["timestamps"].append(timestamp)
+
+    # Display AI Response **(only one per prompt)**
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         response_text = ""
 
-        # Retrieve chat history if memory is enabled
-        chat_history = st.session_state.memory.load_memory_variables({})["chat_history"] if st.session_state.memory_enabled else []
-
-        # Generate AI Response
-        response = chat_model.invoke(chat_history + [HumanMessage(content=user_input)]).content
-
-        # Store conversation in memory if enabled
-        if st.session_state.memory_enabled:
-            st.session_state.memory.save_context({"input": user_input}, {"output": response})
-
-        # Simulate real-time streaming output
         for word in response.split():
             response_text += word + " "
             time.sleep(0.04)  # Simulate typing effect
             response_placeholder.markdown(response_text)
 
-    chat_data["messages"].insert(1, AIMessage(content=response))
-    chat_data["timestamps"].insert(1, timestamp)
+    # Append AI Message (only one response per prompt)
+    st.session_state.chat_sessions[st.session_state.current_chat]["messages"].append(AIMessage(content=response))
+    st.session_state.chat_sessions[st.session_state.current_chat]["timestamps"].append(timestamp)
 
-# Display Chat Messages
-for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
+# Display Chat Messages (Only One AI Response per Prompt)
+for msg, timestamp in zip(
+    st.session_state.chat_sessions[st.session_state.current_chat]["messages"],
+    st.session_state.chat_sessions[st.session_state.current_chat]["timestamps"]
+):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
         st.markdown(f"**[{timestamp}]** {msg.content}")
