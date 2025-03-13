@@ -7,6 +7,7 @@ import os
 import pickle
 import requests
 from dotenv import load_dotenv  # Secure password storage
+from fpdf import FPDF  # PDF Export
 
 # Load environment variables securely
 load_dotenv()
@@ -48,7 +49,20 @@ if st.session_state.dark_mode:
         unsafe_allow_html=True
     )
 
-# Function to get the user's IP address
+# Load Chat Sessions & Banned IPs
+def load_banned_ips():
+    return pickle.load(open(BANNED_IPS_FILE, "rb")) if os.path.exists(BANNED_IPS_FILE) else set()
+
+def save_banned_ips(banned_ips):
+    pickle.dump(banned_ips, open(BANNED_IPS_FILE, "wb"))
+
+def load_chats():
+    return pickle.load(open(CHAT_SESSIONS_FILE, "rb")) if os.path.exists(CHAT_SESSIONS_FILE) else {}
+
+def save_chats():
+    pickle.dump(st.session_state.chat_sessions, open(CHAT_SESSIONS_FILE, "wb"))
+
+# Function to get user IP & check if banned
 def get_user_ip():
     try:
         response = requests.get("https://api64.ipify.org?format=json")
@@ -56,26 +70,10 @@ def get_user_ip():
     except:
         return "Unknown"
 
-# Load & Save Banned IPs
-def load_banned_ips():
-    return pickle.load(open(BANNED_IPS_FILE, "rb")) if os.path.exists(BANNED_IPS_FILE) else set()
-
-def save_banned_ips(banned_ips):
-    pickle.dump(banned_ips, open(BANNED_IPS_FILE, "wb"))
-
-# Load & Save Chat Sessions
-def load_chats():
-    return pickle.load(open(CHAT_SESSIONS_FILE, "rb")) if os.path.exists(CHAT_SESSIONS_FILE) else {}
-
-def save_chats():
-    pickle.dump(st.session_state.chat_sessions, open(CHAT_SESSIONS_FILE, "wb"))
-
-# Get user IP & check if banned
 user_ip = get_user_ip()
 banned_ips = load_banned_ips()
-
 if user_ip in banned_ips:
-    st.error("🚫 Your IP address has been banned due to suspicious activity.")
+    st.error("🚫 Your IP has been banned.")
     st.stop()
 
 # Load all chat sessions
@@ -85,20 +83,17 @@ if "chat_sessions" not in st.session_state:
 # Sidebar - Chat Management
 st.sidebar.header("📂 Chat Sessions")
 
-# Create a new chat
 if st.sidebar.button("➕ New Chat"):
     new_chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
     st.session_state.chat_sessions[new_chat_id] = {"messages": [], "timestamps": []}
     st.session_state.current_chat = new_chat_id
     save_chats()
 
-# Select existing chat
 chat_names = list(st.session_state.chat_sessions.keys())
 if chat_names:
     selected_chat = st.sidebar.radio("💬 Select a Chat", chat_names)
     st.session_state.current_chat = selected_chat
 
-# Ensure there's a selected chat
 if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chat_sessions:
     st.session_state.current_chat = chat_names[0] if chat_names else None
 
@@ -120,30 +115,7 @@ if st.session_state.current_chat:
         save_chats()
         st.rerun()
 
-# Admin-Only Feature: Unblock IP Addresses
-st.sidebar.header("🔓 Unblock IPs (Admin Only)")
-admin_password = st.sidebar.text_input("Enter Admin Password:", type="password")
-
-if admin_password and admin_password == ADMIN_PASSWORD:
-    unblock_ip = st.sidebar.text_input("Enter IP to Unblock:")
-    if st.sidebar.button("✅ Unblock IP"):
-        if unblock_ip in banned_ips:
-            banned_ips.remove(unblock_ip)
-            save_banned_ips(banned_ips)
-            st.sidebar.success(f"✅ IP {unblock_ip} has been unblocked.")
-        else:
-            st.sidebar.warning(f"⚠️ IP {unblock_ip} is not banned.")
-
-# Ensure the selected chat session exists
-if st.session_state.current_chat:
-    chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
-    messages = chat_data["messages"]
-    timestamps = chat_data["timestamps"]
-else:
-    st.warning("Please create a new chat to start chatting!")
-    st.stop()
-
-# Initialize Chat Model with the latest Google Gemini model
+# AI Chatbot Initialization
 chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
 
 # User Input
@@ -151,20 +123,41 @@ user_input = st.chat_input("Ask a Data Science question...")
 
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    messages.insert(0, HumanMessage(content=user_input))
-    timestamps.insert(0, timestamp)
 
-    chat_history = [msg for msg in messages if isinstance(msg, AIMessage)]
+    chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
+    chat_data["messages"].insert(0, HumanMessage(content=user_input))
+    chat_data["timestamps"].insert(0, timestamp)
+
+    chat_history = [msg for msg in chat_data["messages"] if isinstance(msg, AIMessage)]
     response = chat_model.invoke(chat_history + [HumanMessage(content=user_input)])
     response_text = response.content
 
-    messages.insert(1, AIMessage(content=response_text))
-    timestamps.insert(1, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    chat_data["messages"].insert(1, AIMessage(content=response_text))
+    chat_data["timestamps"].insert(1, timestamp)
 
     save_chats()
 
+# Export Chat as PDF
+def export_pdf(chat_data):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, "Chat History", ln=True, align="C")
+    for role, msg in zip(["User", "AI"] * (len(chat_data["messages"]) // 2), chat_data["messages"]):
+        pdf.cell(200, 10, f"{role}: {msg.content}", ln=True)
+    pdf.output("chat_history.pdf")
+
+if st.sidebar.button("📥 Export as PDF"):
+    export_pdf(st.session_state.chat_sessions[st.session_state.current_chat])
+    st.sidebar.success("✅ Chat exported as PDF!")
+
 # Display Chat Messages
-for msg, timestamp in zip(messages, timestamps):
+for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
         st.markdown(f"**[{timestamp}]** {msg.content}")
+
+# User Feedback on AI Response
+feedback = st.radio("Was this response helpful?", ["👍 Yes", "👎 No"], index=None, horizontal=True)
+if feedback:
+    st.write(f"Thank you for your feedback: {feedback}")
