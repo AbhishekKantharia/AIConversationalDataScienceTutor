@@ -4,5 +4,3 @@ langchain_google_genai
 google-generativeai
 requests
 python-dotenv
-bcrypt
-streamlit-authenticator
