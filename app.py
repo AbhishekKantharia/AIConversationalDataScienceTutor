@@ -47,8 +47,6 @@ st.markdown(
     <style>
     body {{ background-color: {'#121212' if st.session_state.dark_mode else '#ffffff'}; color: {'#e0e0e0' if st.session_state.dark_mode else '#000000'}; }}
     .stApp {{ background-color: {'#121212' if st.session_state.dark_mode else '#ffffff'}; }}
-
-    /* 3D Buttons */
     .stButton>button {{
         background: linear-gradient(145deg, #1f1f1f, #292929);
         color: white;
@@ -62,8 +60,6 @@ st.markdown(
         transform: scale(1.07);
         box-shadow: 5px 5px 10px #000000, -5px -5px 10px #444;
     }}
-
-    /* 3D Chat Bubbles */
     .stChatMessage {{
         background: linear-gradient(145deg, #1e1e1e, #252525);
         padding: 15px;
@@ -71,8 +67,6 @@ st.markdown(
         box-shadow: 4px 4px 8px #0a0a0a, -4px -4px 8px #333;
         margin-bottom: 10px;
     }}
-
-    /* 3D Inputs */
     .stTextInput>div>div>input {{
         background: #222;
         color: white;
@@ -129,7 +123,7 @@ if st.session_state.multi_chat:
 # Ensure chat_data exists
 chat_data = st.session_state.chat_sessions.get(st.session_state.current_chat, {"messages": [], "timestamps": []})
 
-# AI Chatbot with Real-Time Streaming
+# AI Chatbot with Real-Time Streaming & Enhanced Formatting
 chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
 user_input = st.chat_input("Ask a Data Science question...")
 
@@ -142,16 +136,33 @@ if user_input:
         response_placeholder = st.empty()
         response_text = ""
 
-        for word in chat_model.invoke([HumanMessage(content=user_input)]).content.split():
+        # Generate AI Response
+        response = chat_model.invoke([HumanMessage(content=user_input)]).content
+
+        # Format response into structured markdown
+        formatted_response = f"""
+        **🔍 Key Insights:**  
+        - **Main Answer:** {response.split(".")[0]}.  
+        - **Supporting Details:** {'. '.join(response.split('.')[1:]) if len(response.split('.')) > 1 else 'N/A'}  
+        - **Additional Notes:** AI-generated structured response to improve clarity.  
+
+        **📝 Summary:**  
+        ```  
+        {response}  
+        ```
+        """
+
+        # Simulate real-time streaming output
+        for word in formatted_response.split():
             response_text += word + " "
-            time.sleep(0.05)  # Simulate real-time streaming
+            time.sleep(0.04)  # Simulate typing effect
             response_placeholder.markdown(response_text)
 
-    chat_data["messages"].insert(1, AIMessage(content=response_text))
+    chat_data["messages"].insert(1, AIMessage(content=formatted_response))
     chat_data["timestamps"].insert(1, timestamp)
 
 # Display Chat Messages
 for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
-        st.markdown(f"[{timestamp}] {msg.content}")
+        st.markdown(f"**[{timestamp}]** {msg.content}")
