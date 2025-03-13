@@ -26,29 +26,30 @@ LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
 
 # Sidebar - Feature Toggles
-st.sidebar.header("⚙️ Toggle Features")
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = False
-if "multi_chat" not in st.session_state:
-    st.session_state.multi_chat = True
-if "pdf_export" not in st.session_state:
-    st.session_state.pdf_export = True
-if "chat_summarization" not in st.session_state:
-    st.session_state.chat_summarization = True
+st.sidebar.header("⚙️ Live Feature Toggles")
+feature_settings = ["dark_mode", "multi_chat", "pdf_export", "chat_summarization"]
+default_values = [False, True, True, True]
 
-# Toggle buttons
+# Initialize session state for toggles
+for feature, default in zip(feature_settings, default_values):
+    if feature not in st.session_state:
+        st.session_state[feature] = default
+
+# Live Toggle Buttons (Update Immediately)
 st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
-st.session_state.multi_chat = st.sidebar.toggle("💬 Enable Multi-Chat", value=st.session_state.multi_chat)
-st.session_state.pdf_export = st.sidebar.toggle("📜 Enable PDF Export", value=st.session_state.pdf_export)
-st.session_state.chat_summarization = st.sidebar.toggle("🧠 Enable AI Summarization", value=st.session_state.chat_summarization)
+st.session_state.multi_chat = st.sidebar.toggle("💬 Multi-Chat", value=st.session_state.multi_chat)
+st.session_state.pdf_export = st.sidebar.toggle("📜 PDF Export", value=st.session_state.pdf_export)
+st.session_state.chat_summarization = st.sidebar.toggle("🧠 AI Summarization", value=st.session_state.chat_summarization)
 
-# Apply 3D Styling with CSS
+# Apply 3D Styling with Live Theme Updates
 st.markdown(
-    """
+    f"""
     <style>
-    body { background-color: #121212; color: #e0e0e0; }
-    .stApp { background-color: #121212; }
-    .stButton>button {
+    body {{ background-color: {'#121212' if st.session_state.dark_mode else '#ffffff'}; color: {'#e0e0e0' if st.session_state.dark_mode else '#000000'}; }}
+    .stApp {{ background-color: {'#121212' if st.session_state.dark_mode else '#ffffff'}; }}
+
+    /* 3D Buttons */
+    .stButton>button {{
         background: linear-gradient(145deg, #1f1f1f, #292929);
         color: white;
         border: none;
@@ -56,25 +57,29 @@ st.markdown(
         box-shadow: 4px 4px 8px #0a0a0a, -4px -4px 8px #333;
         padding: 12px 24px;
         transition: 0.2s;
-    }
-    .stButton>button:hover {
+    }}
+    .stButton>button:hover {{
         transform: scale(1.07);
         box-shadow: 5px 5px 10px #000000, -5px -5px 10px #444;
-    }
-    .stChatMessage {
+    }}
+
+    /* 3D Chat Bubbles */
+    .stChatMessage {{
         background: linear-gradient(145deg, #1e1e1e, #252525);
         padding: 15px;
         border-radius: 12px;
         box-shadow: 4px 4px 8px #0a0a0a, -4px -4px 8px #333;
         margin-bottom: 10px;
-    }
-    .stTextInput>div>div>input {
+    }}
+
+    /* 3D Inputs */
+    .stTextInput>div>div>input {{
         background: #222;
         color: white;
         border: 2px solid #555;
         border-radius: 10px;
         padding: 12px;
-    }
+    }}
     </style>
     """,
     unsafe_allow_html=True
