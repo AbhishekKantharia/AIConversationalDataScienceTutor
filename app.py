@@ -146,6 +146,7 @@ if user_input:
     save_chats()
 
 # Function to Export Chat as a Properly Formatted PDF
+# Function to Export Chat as a Properly Formatted PDF
 def export_pdf(chat_data):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)  # Prevents text cutoff
@@ -160,7 +161,10 @@ def export_pdf(chat_data):
         pdf.cell(0, 8, f"{role}:", ln=True)  
 
         pdf.set_font("Arial", size=11)  # Regular font for messages
-        pdf.multi_cell(0, 7, msg.content)  # Wraps long messages
+        clean_text = msg.content.replace("**", "")  # Remove Markdown Bold Symbols
+        clean_text_1 = msg.content.replace("*", "") # Remove Markdown Bold Symbols
+        pdf.multi_cell(0, 7, clean_text)  # Wraps long messages
+        pdf.multi_cell(0, 7, clean_text_1)  # Wraps long messages
         pdf.ln(3)  # Adds space between messages
 
     # Save the PDF as a file
