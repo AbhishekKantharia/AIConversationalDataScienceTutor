@@ -95,7 +95,16 @@ if chat_names:
     st.session_state.current_chat = selected_chat
 
 if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chat_sessions:
-    st.session_state.current_chat = chat_names[0] if chat_names else None
+    if chat_names:
+        st.session_state.current_chat = chat_names[0]
+    else:
+        st.session_state.current_chat = None
+
+# Ensure chat_data is properly initialized
+if st.session_state.current_chat:
+    chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
+else:
+    chat_data = {"messages": [], "timestamps": []}  # Fallback to avoid errors
 
 # Chat Rename Option
 if st.session_state.current_chat:
@@ -124,7 +133,6 @@ user_input = st.chat_input("Ask a Data Science question...")
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
     chat_data["messages"].insert(0, HumanMessage(content=user_input))
     chat_data["timestamps"].insert(0, timestamp)
 
@@ -148,7 +156,7 @@ def export_pdf(chat_data):
     pdf.output("chat_history.pdf")
 
 if st.sidebar.button("📥 Export as PDF"):
-    export_pdf(st.session_state.chat_sessions[st.session_state.current_chat])
+    export_pdf(chat_data)
     st.sidebar.success("✅ Chat exported as PDF!")
 
 # Display Chat Messages
@@ -156,8 +164,3 @@ for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
         st.markdown(f"**[{timestamp}]** {msg.content}")
-
-# User Feedback on AI Response
-feedback = st.radio("Was this response helpful?", ["👍 Yes", "👎 No"], index=None, horizontal=True)
-if feedback:
-    st.write(f"Thank you for your feedback: {feedback}")
