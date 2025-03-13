@@ -1,6 +1,6 @@
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import SystemMessage, AIMessage, HumanMessage
+from langchain.schema import AIMessage, HumanMessage
 import google.generativeai as genai
 import datetime
 import os
@@ -8,17 +8,39 @@ import pickle
 import requests
 from dotenv import load_dotenv  # Secure password storage
 
-# Load environment variables
+# Load environment variables securely
 load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
-# Set API Key
-genai.configure(api_key="your_actual_api_key_here")
+# Configure Google Gemini API
+genai.configure(api_key=GOOGLE_API_KEY)
 
 # File Paths
 CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 BANNED_IPS_FILE = "banned_ips.pkl"
 LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
+
+# Streamlit Page Config
+st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
+
+# Sidebar - Dark Mode Toggle
+st.sidebar.header("⚙️ Settings")
+dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=False)
+theme = "dark" if dark_mode else "light"
+
+# Apply Dark/Light Mode Styling
+if dark_mode:
+    st.markdown(
+        """
+        <style>
+        body { background-color: #121212; color: white; }
+        .stButton>button { background-color: #333; color: white; }
+        .stTextInput>div>div>input { background-color: #333; color: white; }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 # Function to get the user's IP address
 def get_user_ip():
@@ -28,29 +50,19 @@ def get_user_ip():
     except:
         return "Unknown"
 
-# Load banned IPs
+# Load & Save Banned IPs
 def load_banned_ips():
-    if os.path.exists(BANNED_IPS_FILE):
-        with open(BANNED_IPS_FILE, "rb") as f:
-            return pickle.load(f)
-    return set()
+    return pickle.load(open(BANNED_IPS_FILE, "rb")) if os.path.exists(BANNED_IPS_FILE) else set()
 
-# Save banned IPs
 def save_banned_ips(banned_ips):
-    with open(BANNED_IPS_FILE, "wb") as f:
-        pickle.dump(banned_ips, f)
+    pickle.dump(banned_ips, open(BANNED_IPS_FILE, "wb"))
 
-# Load chat sessions
+# Load & Save Chat Sessions
 def load_chats():
-    if os.path.exists(CHAT_SESSIONS_FILE):
-        with open(CHAT_SESSIONS_FILE, "rb") as f:
-            return pickle.load(f)
-    return {}
+    return pickle.load(open(CHAT_SESSIONS_FILE, "rb")) if os.path.exists(CHAT_SESSIONS_FILE) else {}
 
-# Save chat sessions
 def save_chats():
-    with open(CHAT_SESSIONS_FILE, "wb") as f:
-        pickle.dump(st.session_state.chat_sessions, f)
+    pickle.dump(st.session_state.chat_sessions, open(CHAT_SESSIONS_FILE, "wb"))
 
 # Get user IP & check if banned
 user_ip = get_user_ip()
@@ -82,10 +94,7 @@ if chat_names:
 
 # Ensure there's a selected chat
 if "current_chat" not in st.session_state or st.session_state.current_chat not in st.session_state.chat_sessions:
-    if chat_names:
-        st.session_state.current_chat = chat_names[0]
-    else:
-        st.session_state.current_chat = None
+    st.session_state.current_chat = chat_names[0] if chat_names else None
 
 # Chat Rename Option
 if st.session_state.current_chat:
@@ -105,7 +114,7 @@ if st.session_state.current_chat:
         save_chats()
         st.rerun()
 
-# Unblock IP Addresses (Admin Feature)
+# Admin-Only Feature: Unblock IP Addresses
 st.sidebar.header("🔓 Unblock IPs (Admin Only)")
 admin_password = st.sidebar.text_input("Enter Admin Password:", type="password")
 
@@ -131,36 +140,24 @@ else:
 # Initialize Chat Model with the latest Google Gemini model
 chat_model = ChatGoogleGenerativeAI(model=LATEST_GEMINI_MODEL)
 
-# Function to check if the question is related to Data Science
-def is_data_science_question(question):
-    keywords = ["data science", "machine learning", "AI", "deep learning", "statistics",
-                "Python", "NumPy", "Pandas", "Matplotlib", "scikit-learn", "neural networks",
-                "clustering", "regression", "classification", "time series", "data preprocessing"]
-    
-    question_lower = question.lower()
-    return any(keyword in question_lower for keyword in keywords)
-
 # User Input
 user_input = st.chat_input("Ask me a Data Science question...")
 
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     messages.insert(0, HumanMessage(content=user_input))
     timestamps.insert(0, timestamp)
 
-    if not is_data_science_question(user_input):
-        response_text = "I'm here to assist with Data Science topics only."
-    else:
-        chat_history = [msg for msg in messages if isinstance(msg, AIMessage)]
-        response = chat_model.invoke(chat_history + [HumanMessage(content=user_input)])
-        response_text = response.content
+    chat_history = [msg for msg in messages if isinstance(msg, AIMessage)]
+    response = chat_model.invoke(chat_history + [HumanMessage(content=user_input)])
+    response_text = response.content
 
     messages.insert(1, AIMessage(content=response_text))
     timestamps.insert(1, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     save_chats()
 
+# Display Chat Messages
 for msg, timestamp in zip(messages, timestamps):
     role = "user" if isinstance(msg, HumanMessage) else "assistant"
     with st.chat_message(role):
