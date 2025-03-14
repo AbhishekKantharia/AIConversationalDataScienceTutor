@@ -1,36 +1,40 @@
-# 🚀 ChatGPT-Style AI Data Science Tutor  
-### Powered by Google Gemini 1.5 Pro | Multi-User Authentication | Secure & Free  
+# AI Data Science Tutor Chatbot  
 
-## 🌟 Features  
-✅ **Google Gemini 1.5 Pro** – Latest AI model with **real-time responses**  
-✅ **ChatGPT-Style UI** – Interactive multi-chat system, rename/delete chats  
-✅ **Multi-User Authentication** – Secure login with **Admin & User roles**  
-✅ **Role-Based Access Control** – Admins can **unblock banned IPs**  
-✅ **IP Banning for Security** – Auto-blocks **suspicious activity**  
-✅ **Persistent Chat History** – Saves & restores chats seamlessly  
-✅ **100% Free & No Paywalls** – Premium AI services at **zero cost**  
+This is a **Streamlit-based AI chatbot** that leverages **Google Gemini API** to provide intelligent responses to data science-related queries. The chatbot supports **multi-chat sessions**, **AI summarization**, **PDF export**, **dark mode**, **IP banning**, and more.
 
 ---
 
-## 📥 Installation  
+## 🚀 **Features**  
+✅ **Multi-Chat Support** – Users can create and switch between multiple chat sessions.  
+✅ **AI-Powered Responses** – Uses Google Gemini API for intelligent and context-aware responses.  
+✅ **Delete Chat Option** – Easily remove old conversations from the chat history.  
+✅ **Real-time Streaming** – Responses appear dynamically as they are generated.  
+✅ **PDF Export** – Save chat conversations as PDF files.  
+✅ **Dark Mode** – Enhanced UI experience for users.  
+✅ **AI Summarization** – Summarizes chat history for quick reference.  
+✅ **IP Banning System** – Prevents unauthorized access based on IP addresses.  
+
+---
+
+## 🛠 **Installation & Setup**  
 
 ### **1️⃣ Clone the Repository**  
 ```bash
-git clone https://github.com/yourusername/aiconversationaldatasciencetutor.git
-cd aiconversationaldatasciencetutor
+git clone https://github.com/your-repo/ai-ds-tutor.git
+cd ai-ds-tutor
 ```
 
 ### **2️⃣ Install Dependencies**  
+Ensure you have Python installed, then run:  
 ```bash
 pip install -r requirements.txt
 ```
 
 ### **3️⃣ Set Up Environment Variables**  
 Create a `.env` file in the root directory and add:  
-```
+```env
+GOOGLE_API_KEY=your_google_gemini_api_key
 ADMIN_PASSWORD=your_admin_password
-USER_PASSWORD=your_user_password
-SECRET_KEY=your_secret_key
 ```
 
 ### **4️⃣ Run the Application**  
@@ -40,78 +44,81 @@ streamlit run app.py
 
 ---
 
-## 🛠 Requirements  
-This project requires **Python 3.8+** and the following dependencies:  
-```plaintext
-streamlit
-langchain
-langchain_google_genai
-google-generativeai
-requests
-python-dotenv
-bcrypt
-streamlit-authenticator
+## 📂 **File Structure**  
+
 ```
-To install all dependencies:  
-```bash
-pip install -r requirements.txt
+📁 ai-ds-tutor
+│── app.py               # Main Streamlit application
+│── requirements.txt     # Required Python packages
+│── chat_sessions.pkl    # Stored chat sessions (auto-generated)
+│── banned_ips.pkl       # Banned IPs list (auto-generated)
+│── .env                 # API keys and admin password
+│── README.md            # Documentation
 ```
 
 ---
 
-## 🎯 Usage  
+## 📜 **Usage**  
 
-### **🔑 User Authentication**  
-- **Users**: Can chat with AI but cannot unblock IPs  
-- **Admins**: Have extra privileges (e.g., **unblocking banned users**)  
-
-### **💬 ChatGPT-Style Conversations**  
-- **Real-time responses** with **streaming output**  
-- **Multi-chat support** – create, rename, delete, and switch chats  
-
-### **🔒 Security**  
-- **Auto IP Ban** – Detects & blocks malicious activities  
-- **Admin Dashboard** – Unblock users securely  
+1️⃣ **Ask a Question** – Type a data science-related question in the chat input.  
+2️⃣ **Multi-Chat Support** – Create and switch between multiple chat sessions in the sidebar.  
+3️⃣ **Delete Chat** – Remove a conversation using the "🗑️ Delete Chat" button.  
+4️⃣ **Enable Dark Mode** – Switch to dark mode for better readability.  
+5️⃣ **Export Chat to PDF** – Save your chat for later reference.  
 
 ---
 
-## 🔐 Admin Controls  
+## 🔐 **Admin Features**  
 
-### **1️⃣ Unblock an IP**  
-Admins can **unblock users** from the **sidebar settings**.  
-1. Log in as **Admin**  
-2. Enter the **banned IP address**  
-3. Click **Unblock** ✅  
+### **IP Banning**  
+- The app can ban users based on IP addresses.  
+- Banned users will see a **"🚫 Your IP has been banned."** message.  
 
----
-
-## 📌 Future Enhancements  
-🔹 **User Registration System** – Allow users to sign up dynamically  
-🔹 **Database Integration** – Store chats & user credentials securely  
-🔹 **Analytics Dashboard** – Monitor chat activity & security logs  
+### **Chat Summarization**  
+- AI can generate summaries for long conversations, making it easier to review.  
 
 ---
 
-## 🤝 Contributing  
-Want to **improve** this project? 🎉 Feel free to fork, clone, and **submit pull requests**!  
+## 🔧 **Customization**  
+
+### **Modify the UI**  
+To customize colors and styling, edit the **CSS inside `app.py`**:  
+```python
+st.markdown(
+    """
+    <style>
+    body { background-color: #121212; color: #e0e0e0; }
+    .stSidebar { background-color: #181818; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+```
+
+### **Adjust the AI Model**  
+To use a different **Google Gemini AI model**, change this line in `app.py`:  
+```python
+LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
+```
 
 ---
 
-## 📄 License  
-This project is licensed under the **MIT License** – use it freely!  
+## 📌 **To-Do / Future Improvements**  
+🔹 Improve response streaming for faster replies.  
+🔹 Add a **user authentication system** for chat history security.  
+🔹 Support **file uploads** for AI-based code reviews.  
+🔹 Enhance **PDF export** formatting for better readability.  
 
 ---
 
-## 💬 Need Help?  
-For issues, feel free to create a [GitHub Issue](https://github.com/yourusername/aiconversationaldatasciencetutor/issues).  
-
-🌟 **Star this repo** if you found it useful! ⭐  
+## 🏆 **Contributing**  
+Contributions are welcome! Feel free to submit a pull request or open an issue.  
 
 ---
 
-### **✨ Why This README is Great?**  
-✅ **Clear Installation Steps**  
-✅ **Secure Password Management with `.env`**  
-✅ **Detailed Feature List**  
-✅ **Role-Based Access Documentation**  
-✅ **Future Enhancements Section**  
+## 📜 **License**  
+This project is licensed under the **MIT License**.  
+
+---
+
+🎉 **Enjoy your AI-powered Data Science Chatbot!** 🚀
