@@ -20,7 +20,7 @@ This is a **Streamlit-based AI chatbot** that leverages **Google Gemini API** to
 
 ### **1️⃣ Clone the Repository**  
 ```bash
-git clone https://github.com/AIConversationalDataScienceTutor/AIConversationalDataScienceTutor.git
+git clone https://github.com/AbhishekKantharia/AIConversationalDataScienceTutor.git
 cd AIConversationalDataScienceTutor
 ```
 
