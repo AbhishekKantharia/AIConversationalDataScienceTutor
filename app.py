@@ -23,7 +23,7 @@ BANNED_IPS_FILE = "banned_ips.pkl"
 LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 
 # Streamlit Project Title
-st.tile("AI Data Science Tutor")
+st.title("AI Data Science Tutor 🤖")
 
 # Streamlit Page Config
 st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
