@@ -21,13 +21,23 @@ if not API_KEY:
 # ✅ Configure Google GenAI
 genai.configure(api_key=API_KEY)
 
-# ✅ Function to Get AI Response (Real-time Streaming)
+# ✅ AI System Instructions for Better Response Quality
+SYSTEM_PROMPT = """
+You are an AI Data Science tutor. Provide clear, structured, and insightful answers.
+- **Use bullet points, examples, and explanations**.
+- **Keep responses within 250-300 words**.
+- **Use technical but accessible language**.
+- **Break down concepts into smaller steps**.
+"""
+
+# ✅ Function to Get AI Response (Improved Structure & Formatting)
 def get_ai_response(user_input):
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(user_input)
+        response = model.generate_content(f"{SYSTEM_PROMPT}\n\nQuestion: {user_input}")
         if response and response.text:
-            return response.text  # Clean response
+            formatted_response = f"### ✨ AI Response:\n{response.text.replace('\n', '\n- ')}"
+            return formatted_response
         return "⚠️ Error: AI could not generate a response."
     except Exception as e:
         return f"⚠️ API Error: {str(e)}"
