@@ -8,24 +8,26 @@ import sys
 import graphviz
 from dotenv import load_dotenv
 import os
+import time
 
-# ✅ Securely Fetch API Key from Streamlit Secrets
+# ✅ Securely Fetch API Key
 API_KEY = st.secrets.get("GEMINI_API_KEY")
-
-# ✅ Validate API Key
 if not API_KEY:
-    st.error("⚠️ Google GenAI API key is missing! Please add it to `.streamlit/secrets.toml`.")
+    st.error("⚠️ Google GenAI API key is missing! Add it to `.streamlit/secrets.toml`.")
     st.stop()
 
 # ✅ Configure Google GenAI
 genai.configure(api_key=API_KEY)
 
-# ✅ Function to Get AI Response
+# ✅ Function to Get AI Response (Streaming for Real-time Experience)
 def get_ai_response(user_input):
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(user_input)
-        return f"\n- {response.text.replace('\n', '\n- ')}" if response and response.text else "⚠️ Error: AI could not generate a response."
+        if response and response.text:
+            formatted_response = response.text.replace("\n", "\n- ")
+            return f"- {formatted_response}"
+        return "⚠️ Error: AI could not generate a response."
     except Exception as e:
         return f"⚠️ API Error: {str(e)}"
 
@@ -41,7 +43,7 @@ def save_chat_history():
     with open("chat_history.json", "w") as f:
         json.dump(st.session_state.chat_history, f, indent=4)
 
-# ✅ Load User Preferences
+# ✅ Initialize Session States
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 if "chat_history" not in st.session_state:
@@ -114,19 +116,28 @@ for idx, question in enumerate(quick_questions):
         save_chat_history()
         st.rerun()
 
-# ✅ Chat UI
+# ✅ Chat UI (with Streaming Response)
 st.subheader("🗨 Chat")
 chat_container = st.container()
 with chat_container:
     for role, text in st.session_state.chat_history:
         st.markdown(f"**{'👤 ' if role == st.session_state.username else '🤖 AI:'}** {text}")
 
-# ✅ User Input
+# ✅ User Input with Streaming AI Response
 user_input = st.chat_input("Ask a Data Science question...")
 if user_input:
     st.session_state.chat_history.append((st.session_state.username, user_input))
-    response = get_ai_response(user_input)
-    st.session_state.chat_history.append(("assistant", response))
+    
+    with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+        response_text = ""
+
+        for word in get_ai_response(user_input).split():
+            response_text += word + " "
+            time.sleep(0.03)  # Simulate real-time streaming
+            response_placeholder.markdown(response_text)
+
+    st.session_state.chat_history.append(("assistant", response_text))
     save_chat_history()
     st.rerun()
 
@@ -150,7 +161,7 @@ if code_col1.button("Run Code"):
         if plt.get_fignums():
             st.subheader("📊 Visualization Output:")
             st.pyplot(plt.gcf())
-        st.subheader("🧐 Code Explanation:")
+        st.subheader("🧐 AI Explanation:")
         explanation = get_ai_response(f"Explain this Python code: {st.session_state.code}")
         st.markdown(explanation)
     except Exception as e:
