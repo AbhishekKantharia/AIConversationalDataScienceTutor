@@ -1,7 +1,8 @@
 streamlit
-langchain
-langchain_google_genai
 google-generativeai
-requests
+matplotlib
+pandas
+numpy
+graphviz
 python-dotenv
 fpdf
