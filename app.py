@@ -1,14 +1,15 @@
 import streamlit as st
 import json
+import time
 import matplotlib.pyplot as plt
 import pandas as pd
 import google.generativeai as genai
 import io
 import sys
 import graphviz
+import random
 from dotenv import load_dotenv
 import os
-import time
 
 # ✅ Securely Fetch API Key
 API_KEY = st.secrets.get("GEMINI_API_KEY")
@@ -19,28 +20,18 @@ if not API_KEY:
 # ✅ Configure Google GenAI
 genai.configure(api_key=API_KEY)
 
-# ✅ Function to Get AI Response (Streaming for Real-time Experience)
-def get_ai_response(user_input):
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(user_input)
-        if response and response.text:
-            formatted_response = response.text.replace("\n", "\n- ")
-            return f"- {formatted_response}"
-        return "⚠️ Error: AI could not generate a response."
-    except Exception as e:
-        return f"⚠️ API Error: {str(e)}"
-
 # ✅ Load & Save Chat History
+CHAT_HISTORY_FILE = "chat_history.json"
+
 def load_chat_history():
     try:
-        with open("chat_history.json", "r") as f:
+        with open(CHAT_HISTORY_FILE, "r") as f:
             return json.load(f)
     except FileNotFoundError:
         return []
 
 def save_chat_history():
-    with open("chat_history.json", "w") as f:
+    with open(CHAT_HISTORY_FILE, "w") as f:
         json.dump(st.session_state.chat_history, f, indent=4)
 
 # ✅ Initialize Session States
@@ -52,6 +43,8 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "role" not in st.session_state:
     st.session_state.role = "User"
+if "ai_speed" not in st.session_state:
+    st.session_state.ai_speed = 0.02  # AI typing speed
 
 # ✅ Streamlit Page Config
 st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
@@ -90,6 +83,10 @@ if st.session_state.dark_mode:
 st.sidebar.title("⚙️ Settings")
 st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
 
+# ✅ AI Response Speed Control
+st.sidebar.title("⚡ AI Speed Control")
+st.session_state.ai_speed = st.sidebar.slider("Set AI Typing Speed:", 0.01, 0.1, st.session_state.ai_speed)
+
 st.sidebar.title("📜 Chat History")
 if st.sidebar.button("🗑 Clear Chat History"):
     st.session_state.chat_history = []
@@ -123,7 +120,7 @@ with chat_container:
     for role, text in st.session_state.chat_history:
         st.markdown(f"**{'👤 ' if role == st.session_state.username else '🤖 AI:'}** {text}")
 
-# ✅ User Input with Streaming AI Response
+# ✅ AI Chat (Streaming Response)
 user_input = st.chat_input("Ask a Data Science question...")
 if user_input:
     st.session_state.chat_history.append((st.session_state.username, user_input))
@@ -134,7 +131,7 @@ if user_input:
 
         for word in get_ai_response(user_input).split():
             response_text += word + " "
-            time.sleep(0.03)  # Simulate real-time streaming
+            time.sleep(st.session_state.ai_speed)  # Dynamic AI typing speed
             response_placeholder.markdown(response_text)
 
     st.session_state.chat_history.append(("assistant", response_text))
@@ -169,17 +166,6 @@ if code_col1.button("Run Code"):
 if code_col2.button("Clear Code"):
     st.session_state.code = ""
     st.rerun()
-
-# ✅ Data Science Comparisons
-st.sidebar.title("📊 Data Comparisons")
-data_option = st.sidebar.selectbox("Select comparison", ["None", "ML Models", "Algorithms"])
-comparison_table = {
-    "ML Models": pd.DataFrame({"Model": ["Linear Regression", "Decision Tree", "SVM"], "Accuracy": [85, 78, 82], "Training Time": ["Fast", "Medium", "Slow"]}),
-    "Algorithms": pd.DataFrame({"Algorithm": ["K-Means", "DBSCAN", "Hierarchical"], "Scalability": ["High", "Medium", "Low"], "Use Case": ["Clustering", "Anomaly Detection", "Dendrogram Analysis"]})
-}.get(data_option, None)
-
-if comparison_table is not None:
-    st.table(comparison_table)
 
 # ✅ Data Science Visualizations
 st.sidebar.title("📊 Data Science Visualizations")
