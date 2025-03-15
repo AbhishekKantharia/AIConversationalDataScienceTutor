@@ -22,11 +22,11 @@ CHAT_SESSIONS_FILE = "chat_sessions.pkl"
 BANNED_IPS_FILE = "banned_ips.pkl"
 LATEST_GEMINI_MODEL = "gemini-1.5-pro-latest"
 
-# Streamlit Project Title
-st.title("AI Data Science Tutor 🤖")
-
 # Streamlit Page Config
 st.set_page_config(page_icon="🤖", layout="wide")
+
+# Streamlit Project Title
+st.title("AI Data Science Tutor 🤖")
 
 # Sidebar - Feature Toggles
 st.sidebar.header("⚙️ Toggle Features")
