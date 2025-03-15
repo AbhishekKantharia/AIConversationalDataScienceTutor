@@ -1,8 +1,14 @@
 streamlit
 google-generativeai
-matplotlib
 pandas
 numpy
+matplotlib
+seaborn
+plotly
+scikit-learn
 graphviz
-python-dotenv
 fpdf
+python-dotenv
+openpyxl
+pyyaml
+json5
