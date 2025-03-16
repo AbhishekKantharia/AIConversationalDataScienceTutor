@@ -1,8 +1,5 @@
 streamlit
+langchain
+langchain_community
 langchain-google-genai
-langchain-core
 google-generativeai
-pandas
-plotly
-python-dotenv
-fpdf
