@@ -1,17 +1,17 @@
 import streamlit as st
-import json
-import pandas as pd
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import SystemMessage, HumanMessage
 import google.generativeai as genai
-import io
-import sys
 import os
+import json
 import time
+import datetime
+import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
 from fpdf import FPDF
-import datetime
 
-# ✅ Securely Load API Key
+# ✅ Load API Key Securely
 load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
 if not API_KEY:
@@ -22,22 +22,23 @@ if not API_KEY:
 genai.configure(api_key=API_KEY)
 MODEL = "gemini-1.5-pro"
 
-# ✅ AI System Instructions
-SYSTEM_PROMPT = """
-You are an AI Data Science Tutor specialized in business and industry applications.
-- Provide structured responses using **Markdown**.
-- Use **Headings, Bullet Points, and Code Blocks** for clarity.
+# ✅ AI System Prompt
+SYSTEM_PROMPT = SystemMessage(
+    content="""You are an AI Data Science Tutor specialized in industry applications.
+- Answer professionally with structured formatting.
 - Cover **Finance, Healthcare, Retail, and Manufacturing** industries.
-- Suggest **best ML models, optimizations, datasets, and career advice**.
+- Provide insights on **ML models, optimizations, datasets, and career advice**.
+- Format responses using **headings, bullet points, and code blocks** for clarity.
 """
+)
 
-# ✅ AI Response Generation (Formatted Output)
+# ✅ AI Response Generation with Improved Formatting
 def get_ai_response(user_input):
     try:
-        model = genai.GenerativeModel(MODEL)
-        response = model.generate_content(f"{SYSTEM_PROMPT}\n\nQuestion: {user_input}")
-        if response and response.text:
-            return f"### 🤖 AI Response:\n\n{response.text}"  # Well-formatted output
+        model = ChatGoogleGenerativeAI(model=MODEL)
+        response = model.invoke([SYSTEM_PROMPT, HumanMessage(content=user_input)])
+        if response and response.content:
+            return f"### 🤖 AI Response:\n\n{response.content}"
         return "⚠️ No response generated."
     except Exception as e:
         return f"⚠️ API Error: {str(e)}"
@@ -113,7 +114,7 @@ if user_input:
     save_chat_history()
     st.rerun()
 
-# ✅ Display Chat History with Well-Formatted AI Messages
+# ✅ Display Chat History with Structured Formatting
 st.subheader("📜 Chat History")
 for entry in st.session_state.chat_history:
     if len(entry) == 3:
