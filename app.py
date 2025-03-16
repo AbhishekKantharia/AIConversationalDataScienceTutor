@@ -1,133 +1,173 @@
 import streamlit as st
-import os
-import sqlite3
+import json
 import pandas as pd
-import numpy as np
-import joblib
-import web3
-import tensorflow as tf
-import tensorflow.lite as tflite
-from web3 import Web3
-from sqlalchemy import create_engine
-from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from cryptography.fernet import Fernet
-from langchain.chat_models import ChatGoogleGenerativeAI
-from langchain.schema import SystemMessage, AIMessage, HumanMessage
-from langchain.memory import ConversationBufferMemory
+import google.generativeai as genai
+import os
+import time
+import datetime
+import plotly.express as px
+from dotenv import load_dotenv
+from fpdf import FPDF
+import io
+import sys
 
-# Set API Key
-os.environ["GOOGLE_API_KEY"] = "your_api_key_here"
+# ✅ Securely Load API Key
+load_dotenv()
+API_KEY = os.getenv("GEMINI_API_KEY")
+if not API_KEY:
+    st.error("⚠️ Google GenAI API key is missing! Add it to `.env`.")
+    st.stop()
 
-# Initialize Chat Model
-chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+# ✅ Configure AI Model
+genai.configure(api_key=API_KEY)
+MODEL = "gemini-1.5-pro"
 
-# Persistent SQLite Database
-DATABASE_PATH = "persistent_data.db"
-engine = create_engine(f"sqlite:///{DATABASE_PATH}")
-conn = sqlite3.connect(DATABASE_PATH)
-cursor = conn.cursor()
+# ✅ AI System Instructions
+SYSTEM_PROMPT = """You are an AI Data Science Tutor.
+- Provide structured insights for **Finance, Healthcare, Retail, and Manufacturing**.
+- Offer **ML model suggestions, hyperparameter tuning, and dataset recommendations**.
+- Explain **concepts with examples and code snippets** when needed.
+- Format responses using **headings, bullet points, and markdown formatting**.
+"""
 
-# Streamlit UI
-st.set_page_config(page_title="AI Data Science Tutor", layout="wide")
-st.title("🤖 AI Data Science Tutor")
+# ✅ AI Response Generation (Improved Streaming)
+def get_ai_response(user_input):
+    try:
+        model = genai.GenerativeModel(MODEL)
+        response = model.generate_content(f"{SYSTEM_PROMPT}\n\nQuestion: {user_input}")
+        return response.text if response and response.text else "⚠️ No response generated."
+    except Exception as e:
+        return f"⚠️ API Error: {str(e)}"
 
-# Sidebar - Upload Dataset
-st.sidebar.header("📂 Upload Your Dataset")
-uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
+# ✅ Load & Save Chat History
+CHAT_HISTORY_FILE = "chat_history.json"
 
-# Function to load dataset into SQLite
-def load_dataset(file, table_name):
-    df = pd.read_csv(file)
-    df.to_sql(table_name, engine, index=False, if_exists="replace")
-    return df
+def load_chat_history():
+    try:
+        with open(CHAT_HISTORY_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
 
-# Sidebar - Select Dataset
-st.sidebar.header("📊 Available Datasets")
-table_names = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table';", engine)["name"].tolist()
-selected_dataset = st.sidebar.selectbox("Choose a dataset:", table_names)
+def save_chat_history():
+    with open(CHAT_HISTORY_FILE, "w") as f:
+        json.dump(st.session_state.chat_history, f, indent=4)
 
-if st.sidebar.button("Show Dataset Preview"):
-    preview_df = pd.read_sql_query(f"SELECT * FROM {selected_dataset} LIMIT 5", engine)
-    st.dataframe(preview_df)
+# ✅ Initialize Session States
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = load_chat_history()
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-# 🔹 **AI-Powered Cybersecurity & Anomaly Detection**
-st.sidebar.header("🛡️ AI-Powered Cybersecurity")
-if st.sidebar.button("Run Anomaly Detection"):
-    data = pd.read_sql_query(f"SELECT * FROM {selected_dataset}", engine)
-    feature_cols = st.sidebar.multiselect("Select Features for Anomaly Detection", data.columns)
+# ✅ Streamlit Page Config
+st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
 
-    if feature_cols:
-        X = data[feature_cols]
-        X = StandardScaler().fit_transform(X)
-
-        model = IsolationForest(contamination=0.05)
-        anomalies = model.fit_predict(X)
-        data["Anomaly"] = anomalies
-
-        st.write("✅ **Anomalies Detected!** (1 = Normal, -1 = Anomaly)")
-        st.dataframe(data)
-
-# 🔹 **Blockchain + AI for Secure Data Science**
-st.sidebar.header("🔗 Blockchain + AI Security")
-if st.sidebar.button("Encrypt & Store on Blockchain"):
-    w3 = Web3(Web3.HTTPProvider("https://mainnet.infura.io/v3/YOUR_INFURA_API_KEY"))
-
-    # Generate encryption key
-    key = Fernet.generate_key()
-    cipher = Fernet(key)
+# ✅ User Authentication
+if not st.session_state.logged_in:
+    st.title("🔑 Login to AI Data Science Tutor")
+    username = st.text_input("Enter your username:")
+    role = st.selectbox("Select Role:", ["User", "Admin", "Business Analyst", "Data Scientist"])
     
-    # Encrypt dataset metadata
-    metadata = f"Dataset: {selected_dataset}, Rows: {len(data)}, Features: {len(feature_cols)}"
-    encrypted_metadata = cipher.encrypt(metadata.encode())
+    if st.button("Login"):
+        if not username:
+            st.warning("Please enter your username to proceed.")
+        else:
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.session_state.role = role
+            st.rerun()
+    st.stop()
 
-    # Store encrypted data hash on blockchain (simulation)
-    tx_hash = w3.keccak(text=encrypted_metadata.decode()).hex()
-    st.write(f"🔗 **Encrypted Data Stored on Blockchain!** TX Hash: `{tx_hash}`")
+st.sidebar.title("🔑 User")
+st.sidebar.write(f"👋 Welcome, {st.session_state.username}! ({st.session_state.role})")
 
-# 🔹 **Edge AI for IoT & Smart Devices**
-st.sidebar.header("🤖 Edge AI for IoT")
-if st.sidebar.button("Deploy AI Model to Edge Device"):
-    data = pd.read_sql_query(f"SELECT * FROM {selected_dataset}", engine)
-    target_col = st.sidebar.selectbox("Select Target Column", data.columns)
+# ✅ Dark Mode Toggle
+st.sidebar.title("⚙️ Settings")
+st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
 
-    if target_col:
-        X = data.drop(columns=[target_col])
-        y = data[target_col]
+# ✅ Industry-Specific Topics
+st.sidebar.title("🏢 Industry Use Cases")
+industry = st.sidebar.selectbox("Select Industry", ["Finance", "Healthcare", "Retail", "Manufacturing", "General AI"])
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        model = tf.keras.Sequential([
-            tf.keras.layers.Dense(16, activation="relu", input_shape=(X.shape[1],)),
-            tf.keras.layers.Dense(8, activation="relu"),
-            tf.keras.layers.Dense(1, activation="sigmoid")
-        ])
-        model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
-        model.fit(X_train, y_train, epochs=5, verbose=0)
-
-        # Convert to TensorFlow Lite Model
-        converter = tflite.TFLiteConverter.from_keras_model(model)
-        tflite_model = converter.convert()
-
-        with open("edge_model.tflite", "wb") as f:
-            f.write(tflite_model)
-
-        st.success("✅ Model Deployed to Edge Device (TFLite)!")
-
-# User Input
-user_input = st.text_area("Ask a Data Science question, enter Python code, or write an SQL query:")
+# ✅ Chat UI
+st.title("🧠 AI Data Science Tutor")
+user_input = st.chat_input("Ask an AI-powered question...")
 
 if user_input:
-    st.session_state.messages.append(HumanMessage(content=user_input))
-    chat_history = memory.load_memory_variables({})["chat_history"]
-    response = chat_model.predict_messages(chat_history + [HumanMessage(content=user_input)])
-    st.session_state.messages.append(AIMessage(content=response.content))
-    memory.save_context({"input": user_input}, {"output": response.content})
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.session_state.chat_history.append(("user", user_input, timestamp))
 
-# Display Chat History
-for msg in st.session_state.messages:
-    if isinstance(msg, HumanMessage):
-        st.markdown(f"**🧑‍💻 You:** {msg.content}")
-    elif isinstance(msg, AIMessage):
-        st.markdown(f"**🤖 AI Tutor:** {msg.content}")
+    with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+        response_text = ""
+
+        for word in get_ai_response(user_input).split():
+            response_text += word + " "
+            time.sleep(0.02)  # Simulating real-time streaming
+            response_placeholder.markdown(response_text)
+
+    st.session_state.chat_history.append(("assistant", response_text, timestamp))
+    save_chat_history()
+    st.rerun()
+
+# ✅ Display Chat History with Structured Formatting
+st.subheader("📜 Chat History")
+for role, msg, timestamp in st.session_state.chat_history:
+    role_display = "👤 **User:**" if role == "user" else "🤖 **AI:**"
+    with st.chat_message(role):
+        st.markdown(f"**[{timestamp}] {role_display}**\n\n{msg}", unsafe_allow_html=True)
+
+# ✅ AI-Powered Resume Evaluator
+st.sidebar.title("💼 Job & Resume AI Insights")
+resume_text = st.sidebar.text_area("Paste your Resume for AI Analysis")
+
+if st.sidebar.button("🔍 Analyze Resume"):
+    ai_resume_feedback = get_ai_response(f"Analyze this resume for a data science job:\n\n{resume_text}")
+    st.sidebar.markdown(ai_resume_feedback)
+
+# ✅ Upload Data for AI Analysis
+st.sidebar.title("📂 Upload Data for AI Analysis")
+uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
+
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
+    st.subheader("📊 Uploaded Data Preview")
+    st.dataframe(df.head())
+
+    st.subheader("🔍 AI Insights on Data")
+    ai_data_analysis = get_ai_response(f"Analyze this dataset:\n\n{df.head().to_string()}")
+    st.markdown(ai_data_analysis)
+
+    # ✅ Auto-Generated Visualizations
+    st.subheader("📊 AI-Generated Visualization")
+    fig = px.histogram(df, x=df.columns[0], title="Data Distribution")
+    st.plotly_chart(fig)
+
+# ✅ AI-Powered PDF Chat Export
+def export_pdf():
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+
+    pdf.cell(200, 10, "Chat History", ln=True, align="C")
+    pdf.ln(5)
+
+    for role, msg, timestamp in st.session_state.chat_history:
+        pdf.set_font("Arial", style='B', size=12)
+        pdf.cell(0, 8, f"[{timestamp}] {'User' if role == 'user' else 'AI'}:", ln=True)
+        pdf.set_font("Arial", size=11)
+        pdf.multi_cell(0, 7, msg)
+        pdf.ln(3)
+
+    pdf_file_path = "chat_history.pdf"
+    pdf.output(pdf_file_path)
+    return pdf_file_path
+
+if st.sidebar.button("📥 Export Chat as PDF"):
+    pdf_path = export_pdf()
+    with open(pdf_path, "rb") as f:
+        st.sidebar.download_button(label="⬇️ Download PDF", data=f, file_name="chat_history.pdf", mime="application/pdf")
+        st.sidebar.success("✅ PDF is ready for download!")
