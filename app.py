@@ -9,6 +9,7 @@ import time
 import plotly.express as px
 from dotenv import load_dotenv
 from fpdf import FPDF
+from langchain.schema import AIMessage, HumanMessage  # ✅ Import Messages for Visibility
 
 # ✅ Securely Load API Key
 load_dotenv()
@@ -21,22 +22,21 @@ if not API_KEY:
 genai.configure(api_key=API_KEY)
 MODEL = "gemini-1.5-pro"
 
-# ✅ AI System Instructions
+# ✅ AI System Instructions (Industry Focus)
 SYSTEM_PROMPT = """
-You are an AI Data Science Tutor specialized in business and industry applications.
+You are an AI Data Science Tutor specialized in industry applications:
 - Provide structured insights for **Finance, Healthcare, Retail, and Manufacturing**.
 - Suggest **best ML models, hyperparameters, and optimizations**.
 - Recommend **datasets, tools, and career pathways** for Data Scientists.
 - Generate **business reports, visual insights, and AI-powered documentation**.
-- Please **format the response in a detailed and a well formatted manner**.
 """
 
-# ✅ AI Response Generation (Improved)
+# ✅ AI Response Generation with Streaming
 def get_ai_response(user_input):
     try:
         model = genai.GenerativeModel(MODEL)
         response = model.generate_content(f"{SYSTEM_PROMPT}\n\nQuestion: {user_input}")
-        return f"### 🔍 AI Insights:\n{response.text.replace('\n', '\n- ')}" if response and response.text else "⚠️ No response generated."
+        return response.text if response and response.text else "⚠️ No response generated."
     except Exception as e:
         return f"⚠️ API Error: {str(e)}"
 
@@ -75,6 +75,7 @@ if not st.session_state.logged_in:
         else:
             st.session_state.logged_in = True
             st.session_state.username = username
+            st.session_state.role = role
             st.rerun()
     st.stop()
 
@@ -85,6 +86,15 @@ st.sidebar.write(f"👋 Welcome, {st.session_state.username}!")
 st.sidebar.title("⚙️ Settings")
 st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
 
+# ✅ Apply Dark Mode Styling
+if st.session_state.dark_mode:
+    st.markdown("""
+        <style>
+            body { background-color: #1E1E1E; color: white; }
+            .stButton>button { background-color: #444; color: white; border-radius: 5px; }
+        </style>
+    """, unsafe_allow_html=True)
+
 # ✅ Industry-Specific Topics
 st.sidebar.title("🏢 Industry Use Cases")
 industry = st.sidebar.selectbox("Select Industry", ["Finance", "Healthcare", "Retail", "Manufacturing", "General AI"])
@@ -94,8 +104,12 @@ st.title("🧠 AI Data Science Tutor")
 user_input = st.chat_input("Ask an industry-specific AI question...")
 
 if user_input:
-    st.session_state.chat_history.append((st.session_state.username, user_input))
-    
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    # ✅ Display Human Message
+    st.session_state.chat_history.append(HumanMessage(content=user_input))
+    st.session_state.chat_history.append(("🧑‍💻 **You:**", user_input, timestamp))
+
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         response_text = ""
@@ -105,9 +119,17 @@ if user_input:
             time.sleep(0.03)
             response_placeholder.markdown(response_text)
 
-    st.session_state.chat_history.append(("assistant", response_text))
+    # ✅ Display AI Message
+    st.session_state.chat_history.append(AIMessage(content=response_text))
+    st.session_state.chat_history.append(("🤖 **AI:**", response_text, timestamp))
+
     save_chat_history()
     st.rerun()
+
+# ✅ Display Chat History with Timestamps
+st.subheader("📜 Chat History")
+for role, msg, timestamp in st.session_state.chat_history:
+    st.markdown(f"**[{timestamp}] {role}** {msg}")
 
 # ✅ Business Data Upload & AI Insights
 st.sidebar.title("📂 Upload Data for AI Analysis")
@@ -134,3 +156,27 @@ resume_text = st.sidebar.text_area("Paste your Resume for AI Analysis")
 if st.sidebar.button("🔍 Analyze Resume"):
     ai_resume_feedback = get_ai_response(f"Analyze this resume for a data science job:\n\n{resume_text}")
     st.sidebar.markdown(ai_resume_feedback)
+
+# ✅ Chat History Download as PDF
+st.sidebar.title("📥 Export Chat History")
+if st.sidebar.button("📄 Download as PDF"):
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, "Chat History", ln=True, align="C")
+    pdf.ln(5)
+
+    for role, msg, timestamp in st.session_state.chat_history:
+        pdf.set_font("Arial", style='B', size=12)
+        pdf.cell(0, 8, f"[{timestamp}] {role}:", ln=True)
+        pdf.set_font("Arial", size=11)
+        pdf.multi_cell(0, 7, msg)
+        pdf.ln(3)
+
+    pdf_file_path = "chat_history.pdf"
+    pdf.output(pdf_file_path)
+
+    with open(pdf_file_path, "rb") as f:
+        st.sidebar.download_button("⬇️ Download PDF", data=f, file_name="chat_history.pdf", mime="application/pdf")
+        st.sidebar.success("✅ PDF Ready for Download!")
