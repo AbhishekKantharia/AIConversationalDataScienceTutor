@@ -4,9 +4,3 @@ pandas
 plotly
 fpdf
 python-dotenv
-json
-sys
-io
-time
-matplotlib
-graphviz
