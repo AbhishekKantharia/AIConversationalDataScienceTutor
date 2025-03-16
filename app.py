@@ -24,22 +24,20 @@ MODEL = "gemini-1.5-pro"
 
 # ✅ AI System Instructions
 SYSTEM_PROMPT = """
-You are an AI Data Science Tutor specialized in all the industry applications.
-- Provide structured responses in markdown format for **clarity and readability**.
-- Use **Headings, Bullet Points, and Tables** for better comprehension.
-- Cover insights for **Finance, Healthcare, Retail, and Manufacturing** industries.
-- Suggest **best ML models, hyperparameters, and optimizations**.
-- Recommend **datasets, tools, and career pathways** for Data Scientists.
-- Generate **business reports, visual insights, and AI-powered documentation**.
+You are an AI Data Science Tutor specialized in business and industry applications.
+- Provide structured responses using **Markdown**.
+- Use **Headings, Bullet Points, and Code Blocks** for clarity.
+- Cover **Finance, Healthcare, Retail, and Manufacturing** industries.
+- Suggest **best ML models, optimizations, datasets, and career advice**.
 """
 
-# ✅ AI Response Generation (Structured Output)
+# ✅ AI Response Generation (Formatted Output)
 def get_ai_response(user_input):
     try:
         model = genai.GenerativeModel(MODEL)
         response = model.generate_content(f"{SYSTEM_PROMPT}\n\nQuestion: {user_input}")
         if response and response.text:
-            return f"🔍 AI Insights: \n \n {response.text}"  # Structured Output
+            return f"### 🤖 AI Response:\n\n{response.text}"  # Well-formatted output
         return "⚠️ No response generated."
     except Exception as e:
         return f"⚠️ API Error: {str(e)}"
@@ -109,20 +107,20 @@ if user_input:
         for word in get_ai_response(user_input).split():
             response_text += word + " "
             time.sleep(0.03)
-            response_placeholder.markdown(response_text)
+            response_placeholder.markdown(response_text, unsafe_allow_html=True)
 
     st.session_state.chat_history.append(("assistant", response_text, timestamp))
     save_chat_history()
     st.rerun()
 
-# ✅ Display Chat History with Structured UI
+# ✅ Display Chat History with Well-Formatted AI Messages
 st.subheader("📜 Chat History")
 for entry in st.session_state.chat_history:
     if len(entry) == 3:
         role, msg, timestamp = entry
-        role_display = "👤 User" if role == "user" else "🤖 AI"
+        role_display = "👤 **User:**" if role == "user" else "🤖 **AI:**"
         with st.chat_message(role):
-            st.markdown(f"**[{timestamp}] {role_display}:**\n\n{msg}")
+            st.markdown(f"**[{timestamp}] {role_display}**\n\n{msg}", unsafe_allow_html=True)
 
 # ✅ Business Data Upload & AI Insights
 st.sidebar.title("📂 Upload Data for AI Analysis")
