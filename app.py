@@ -28,6 +28,7 @@ You are an AI Data Science Tutor specialized in business and industry applicatio
 - Suggest **best ML models, hyperparameters, and optimizations**.
 - Recommend **datasets, tools, and career pathways** for Data Scientists.
 - Generate **business reports, visual insights, and AI-powered documentation**.
+- Please **format the response in a detailed and a well formatted manner**.
 """
 
 # ✅ AI Response Generation (Improved)
