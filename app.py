@@ -25,18 +25,22 @@ MODEL = "gemini-1.5-pro"
 # ✅ AI System Instructions
 SYSTEM_PROMPT = """
 You are an AI Data Science Tutor specialized in business and industry applications.
-- Provide structured insights for **Finance, Healthcare, Retail, and Manufacturing**.
+- Provide structured responses in markdown format for **clarity and readability**.
+- Use **Headings, Bullet Points, and Tables** for better comprehension.
+- Cover insights for **Finance, Healthcare, Retail, and Manufacturing** industries.
 - Suggest **best ML models, hyperparameters, and optimizations**.
 - Recommend **datasets, tools, and career pathways** for Data Scientists.
 - Generate **business reports, visual insights, and AI-powered documentation**.
 """
 
-# ✅ AI Response Generation (Improved)
+# ✅ AI Response Generation (Structured Output)
 def get_ai_response(user_input):
     try:
         model = genai.GenerativeModel(MODEL)
         response = model.generate_content(f"{SYSTEM_PROMPT}\n\nQuestion: {user_input}")
-        return response.text if response and response.text else "⚠️ No response generated."
+        if response and response.text:
+            return f"### 🔍 AI Insights:\n\n{response.text}"  # Structured Output
+        return "⚠️ No response generated."
     except Exception as e:
         return f"⚠️ API Error: {str(e)}"
 
@@ -111,15 +115,14 @@ if user_input:
     save_chat_history()
     st.rerun()
 
-# ✅ Display Chat History with Timestamps
+# ✅ Display Chat History with Structured UI
 st.subheader("📜 Chat History")
 for entry in st.session_state.chat_history:
-    if len(entry) == 3:  # If timestamp exists
+    if len(entry) == 3:
         role, msg, timestamp = entry
-        st.markdown(f"**[{timestamp}] {role}:** {msg}")
-    else:  # If timestamp is missing (fallback)
-        role, msg = entry
-        st.markdown(f"**{role}:** {msg}")
+        role_display = "👤 User" if role == "user" else "🤖 AI"
+        with st.chat_message(role):
+            st.markdown(f"**[{timestamp}] {role_display}:**\n\n{msg}")
 
 # ✅ Business Data Upload & AI Insights
 st.sidebar.title("📂 Upload Data for AI Analysis")
@@ -147,7 +150,7 @@ if st.sidebar.button("🔍 Analyze Resume"):
     ai_resume_feedback = get_ai_response(f"Analyze this resume for a data science job:\n\n{resume_text}")
     st.sidebar.markdown(ai_resume_feedback)
 
-# ✅ Export Chat History as PDF
+# ✅ Export Chat History as PDF with Formatting
 def export_pdf():
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -161,7 +164,7 @@ def export_pdf():
         if len(entry) == 3:
             role, msg, timestamp = entry
             pdf.set_font("Arial", style='B', size=12)
-            pdf.cell(0, 8, f"[{timestamp}] {role}:", ln=True)
+            pdf.cell(0, 8, f"[{timestamp}] {'User' if role == 'user' else 'AI'}:", ln=True)
             pdf.set_font("Arial", size=11)
             pdf.multi_cell(0, 7, msg)
             pdf.ln(3)
