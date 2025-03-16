@@ -39,7 +39,7 @@ def get_ai_response(user_input):
         model = genai.GenerativeModel(MODEL)
         response = model.generate_content(f"{SYSTEM_PROMPT}\n\nQuestion: {user_input}")
         if response and response.text:
-            return f"### 🔍 AI Insights:\n\n{response.text}"  # Structured Output
+            return f"🔍 AI Insights: \n \n {response.text}"  # Structured Output
         return "⚠️ No response generated."
     except Exception as e:
         return f"⚠️ API Error: {str(e)}"
