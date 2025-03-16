@@ -1,179 +1,148 @@
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain.schema import SystemMessage, AIMessage, HumanMessage
+from langchain.memory import ConversationBufferMemory
 import google.generativeai as genai
-import os
-import json
-import time
 import datetime
-import pandas as pd
-import plotly.express as px
-from dotenv import load_dotenv
+import os
+import speech_recognition as sr
 from fpdf import FPDF
+import nbformat
 
-# ✅ Load API Key Securely
-load_dotenv()
-API_KEY = os.getenv("GEMINI_API_KEY")
-if not API_KEY:
-    st.error("⚠️ Google GenAI API key is missing! Add it to `.env`.")
-    st.stop()
+# Set API Key
+genai.configure(api_key="your_actual_api_key_here")
 
-# ✅ Configure AI Model
-genai.configure(api_key=API_KEY)
-MODEL = "gemini-1.5-pro"
+# Initialize Chat Model
+chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
 
-# ✅ AI System Prompt
-SYSTEM_PROMPT = SystemMessage(
-    content="""You are an AI Data Science Tutor specialized in industry applications.
-- Answer professionally with structured formatting.
-- Cover **Finance, Healthcare, Retail, and Manufacturing** industries.
-- Provide insights on **ML models, optimizations, datasets, and career advice**.
-- Format responses using **headings, bullet points, and code blocks** for clarity.
-"""
-)
+# Streamlit UI Setup
+st.set_page_config(page_title="AI Data Science Tutor", layout="wide")
+st.title("🤖 AI Data Science Tutor")
+st.markdown("Ask me anything about **Data Science!** I support **multi-turn conversations.**")
 
-# ✅ AI Response Generation with Improved Formatting
-def get_ai_response(user_input):
-    try:
-        model = ChatGoogleGenerativeAI(model=MODEL)
-        response = model.invoke([SYSTEM_PROMPT, HumanMessage(content=user_input)])
-        if response and response.content:
-            return f"### 🤖 AI Response:\n\n{response.content}"
-        return "⚠️ No response generated."
-    except Exception as e:
-        return f"⚠️ API Error: {str(e)}"
+# Sidebar - Memory Settings
+st.sidebar.header("⚙️ Chat Settings")
+memory_enabled = st.sidebar.checkbox("Enable Memory", value=True)
 
-# ✅ Load & Save Chat History
-def load_chat_history():
-    try:
-        with open("chat_history.json", "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
+if st.sidebar.button("🗑️ Clear Chat"):
+    st.session_state.messages = []
+    st.session_state.timestamps = []
+    if os.path.exists("chat_history.txt"):
+        os.remove("chat_history.txt")
+    st.success("Chat history cleared!")
 
-def save_chat_history():
-    with open("chat_history.json", "w") as f:
-        json.dump(st.session_state.chat_history, f, indent=4)
+# Initialize Memory if Enabled
+if memory_enabled:
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+else:
+    memory = None  # No memory when disabled
 
-# ✅ Initialize Session States
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = False
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = load_chat_history()
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+# Initialize Chat History
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+    st.session_state.timestamps = []  # Store timestamps
 
-# ✅ Streamlit Page Config
-st.set_page_config(page_title="Industry AI Data Science Tutor", page_icon="🤖", layout="wide")
-
-# ✅ Authentication System
-if not st.session_state.logged_in:
-    st.title("🔑 Login to AI Data Science Tutor")
-    username = st.text_input("Enter your username:")
-    role = st.selectbox("Select Role:", ["User", "Admin", "Business Analyst", "Data Scientist"])
-    
-    if st.button("Login"):
-        if not username:
-            st.warning("Please enter your username to proceed.")
-        else:
-            st.session_state.logged_in = True
-            st.session_state.username = username
-            st.session_state.role = role
-            st.rerun()
-    st.stop()
-
-st.sidebar.title("🔑 User")
-st.sidebar.write(f"👋 Welcome, {st.session_state.username}!")
-
-# ✅ Sidebar - Dark Mode Toggle
-st.sidebar.title("⚙️ Settings")
-st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
-
-# ✅ Industry-Specific Topics
-st.sidebar.title("🏢 Industry Use Cases")
-industry = st.sidebar.selectbox("Select Industry", ["Finance", "Healthcare", "Retail", "Manufacturing", "General AI"])
-
-# ✅ Chat Interface
-st.title("🧠 AI Data Science Tutor")
-user_input = st.chat_input("Ask an industry-specific AI question...")
-
-if user_input:
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.session_state.chat_history.append(("user", user_input, timestamp))
-    
-    with st.chat_message("assistant"):
-        response_placeholder = st.empty()
-        response_text = ""
-
-        for word in get_ai_response(user_input).split():
-            response_text += word + " "
-            time.sleep(0.03)
-            response_placeholder.markdown(response_text, unsafe_allow_html=True)
-
-    st.session_state.chat_history.append(("assistant", response_text, timestamp))
-    save_chat_history()
-    st.rerun()
-
-# ✅ Display Chat History with Structured Formatting
-st.subheader("📜 Chat History")
-for entry in st.session_state.chat_history:
-    if len(entry) == 3:
-        role, msg, timestamp = entry
-        role_display = "👤 **User:**" if role == "user" else "🤖 **AI:**"
-        with st.chat_message(role):
-            st.markdown(f"**[{timestamp}] {role_display}**\n\n{msg}", unsafe_allow_html=True)
-
-# ✅ Business Data Upload & AI Insights
-st.sidebar.title("📂 Upload Data for AI Analysis")
-uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
-
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
-    st.subheader("📊 Uploaded Data Preview")
-    st.dataframe(df.head())
-
-    st.subheader("🔍 AI Insights on Data")
-    ai_data_analysis = get_ai_response(f"Analyze this dataset:\n\n{df.head().to_string()}")
-    st.markdown(ai_data_analysis)
-
-    # ✅ Auto-Generated Visualizations
-    st.subheader("📊 AI-Generated Visualization")
-    fig = px.histogram(df, x=df.columns[0], title="Data Distribution")
-    st.plotly_chart(fig)
-
-# ✅ AI-Powered Resume Evaluator
-st.sidebar.title("💼 Job & Resume AI Insights")
-resume_text = st.sidebar.text_area("Paste your Resume for AI Analysis")
-
-if st.sidebar.button("🔍 Analyze Resume"):
-    ai_resume_feedback = get_ai_response(f"Analyze this resume for a data science job:\n\n{resume_text}")
-    st.sidebar.markdown(ai_resume_feedback)
-
-# ✅ Export Chat History as PDF with Formatting
-def export_pdf():
+# Function to save chat history as a PDF
+def save_chat_as_pdf():
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     pdf.set_font("Arial", size=12)
-
-    pdf.cell(200, 10, "Chat History", ln=True, align="C")
-    pdf.ln(5)
-
-    for entry in st.session_state.chat_history:
-        if len(entry) == 3:
-            role, msg, timestamp = entry
-            pdf.set_font("Arial", style='B', size=12)
-            pdf.cell(0, 8, f"[{timestamp}] {'User' if role == 'user' else 'AI'}:", ln=True)
-            pdf.set_font("Arial", size=11)
-            pdf.multi_cell(0, 7, msg)
-            pdf.ln(3)
+    
+    pdf.cell(200, 10, "AI Data Science Tutor - Chat History", ln=True, align="C")
+    pdf.ln(10)
+    
+    for msg, timestamp in zip(st.session_state.messages, st.session_state.timestamps):
+        role = "User" if isinstance(msg, HumanMessage) else "AI Tutor"
+        pdf.multi_cell(0, 10, f"[{timestamp}] {role}: {msg.content}\n")
+        pdf.ln(2)
 
     pdf_file_path = "chat_history.pdf"
     pdf.output(pdf_file_path)
     return pdf_file_path
 
-if st.sidebar.button("📥 Export Chat as PDF"):
-    pdf_path = export_pdf()
-    with open(pdf_path, "rb") as f:
-        st.sidebar.download_button(label="⬇️ Download PDF", data=f, file_name="chat_history.pdf", mime="application/pdf")
-        st.sidebar.success("✅ PDF is ready for download!")
+# Function to save chat as a Jupyter Notebook
+def save_chat_as_notebook():
+    nb = nbformat.v4.new_notebook()
+    cells = []
+    
+    for msg, timestamp in zip(st.session_state.messages, st.session_state.timestamps):
+        role = "User" if isinstance(msg, HumanMessage) else "AI Tutor"
+        text = f"**[{timestamp}] {role}:** {msg.content}"
+        cells.append(nbformat.v4.new_markdown_cell(text))
+
+    nb.cells = cells
+    nb_file_path = "chat_history.ipynb"
+    
+    with open(nb_file_path, "w") as f:
+        nbformat.write(nb, f)
+    
+    return nb_file_path
+
+# Function to capture voice input
+def voice_to_text():
+    recognizer = sr.Recognizer()
+    with sr.Microphone() as source:
+        st.info("🎤 Listening... Speak now!")
+        audio = recognizer.listen(source)
+
+    try:
+        text = recognizer.recognize_google(audio)
+        return text
+    except sr.UnknownValueError:
+        st.error("😕 Sorry, could not understand the audio.")
+    except sr.RequestError:
+        st.error("⚠️ Could not request results, check your internet connection.")
+    return None
+
+# Sidebar - Download Chat History
+st.sidebar.header("📄 Download Chat History")
+if st.sidebar.button("📥 Download as PDF"):
+    pdf_path = save_chat_as_pdf()
+    with open(pdf_path, "rb") as file:
+        st.sidebar.download_button("Download PDF", file, file_name="chat_history.pdf")
+
+if st.sidebar.button("📓 Download as Jupyter Notebook"):
+    notebook_path = save_chat_as_notebook()
+    with open(notebook_path, "rb") as file:
+        st.sidebar.download_button("Download Notebook", file, file_name="chat_history.ipynb")
+
+# User Input (with voice support)
+col1, col2 = st.columns([4, 1])
+with col1:
+    user_input = st.chat_input("Ask me a Data Science question...")
+
+with col2:
+    if st.button("🎙️ Speak"):
+        spoken_text = voice_to_text()
+        if spoken_text:
+            user_input = spoken_text
+            st.success(f"🗣️ You said: {spoken_text}")
+
+if user_input:
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Append User Message & Timestamp (User message always on top)
+    st.session_state.messages.insert(0, HumanMessage(content=user_input))
+    st.session_state.timestamps.insert(0, timestamp)
+
+    # Retrieve Chat History from Memory
+    chat_history = memory.load_memory_variables({})["chat_history"] if memory_enabled else []
+
+    # Generate AI Response
+    response = chat_model.predict_messages(chat_history + [HumanMessage(content=user_input)])
+
+    # Append AI Response & Timestamp (Directly below user message)
+    response_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.session_state.messages.insert(1, AIMessage(content=response.content))
+    st.session_state.timestamps.insert(1, response_timestamp)
+
+    # Save to Memory if Enabled
+    if memory_enabled:
+        memory.save_context({"input": user_input}, {"output": response.content})
+
+# Display Chat History (User Messages First)
+for msg, timestamp in zip(st.session_state.messages, st.session_state.timestamps):
+    role = "user" if isinstance(msg, HumanMessage) else "assistant"
+    with st.chat_message(role):
+        st.markdown(f"**[{timestamp}]** {msg.content}")
