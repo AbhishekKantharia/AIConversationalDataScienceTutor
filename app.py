@@ -24,7 +24,7 @@ MODEL = "gemini-1.5-pro"
 
 # ✅ AI System Instructions
 SYSTEM_PROMPT = """
-You are an AI Data Science Tutor specialized in business and industry applications.
+You are an AI Data Science Tutor specialized in all the industry applications.
 - Provide structured responses in markdown format for **clarity and readability**.
 - Use **Headings, Bullet Points, and Tables** for better comprehension.
 - Cover insights for **Finance, Healthcare, Retail, and Manufacturing** industries.
