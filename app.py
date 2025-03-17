@@ -160,9 +160,10 @@ if st.session_state.current_chat:
     for date, messages in grouped_messages.items():
         st.subheader(f"📅 {date}")
         for msg, timestamp in messages:
-            role = "👤 User" if isinstance(msg, str) else "🤖 AI"
+            role = "user" if isinstance(msg, str) else "ai"
+            icon = "👤" if role == "user" else "🤖"
             with st.chat_message(role):
-                st.markdown(f"**[{timestamp}] {role}:** {msg}")
+                st.markdown(f"**{icon} [{timestamp}]**: {msg}")
 
 # ✅ User Input
 user_input = st.chat_input("Ask a Data Science question...")
@@ -188,7 +189,7 @@ if user_input:
         for word in get_ai_response(user_input).split():
             response_text += word + " "
             time.sleep(0.03)
-            response_placeholder.markdown(response_text)
+            response_placeholder.markdown(f"**🤖 [{timestamp}]**: {response_text}")
 
     # ✅ Append AI Response
     st.session_state.chat_sessions[st.session_state.current_chat]["messages"].append(response_text)
