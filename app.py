@@ -119,14 +119,14 @@ if st.session_state.current_chat:
         st.session_state.chat_sessions.remove(st.session_state.current_chat)
         st.session_state.chat_sessions.append(new_chat_name)
         st.session_state.current_chat = new_chat_name
-        st.experimental_rerun()
+        st.rerun()
 
 # ✅ Delete Chat Option
 if st.session_state.current_chat and st.sidebar.button("🗑️ Delete Chat"):
     os.remove(os.path.join(CHAT_SESSIONS_DIR, f"{st.session_state.current_chat}.json"))
     st.session_state.chat_sessions.remove(st.session_state.current_chat)
     st.session_state.current_chat = None
-    st.experimental_rerun()
+    st.rerun()
 
 # ✅ Load Chat Data
 if st.session_state.current_chat:
@@ -164,7 +164,7 @@ if user_input:
     chat_data.append({"role": "assistant", "message": response_text, "timestamp": timestamp})
     save_chat_history(st.session_state.current_chat, chat_data)
 
-    st.experimental_rerun()
+    st.rerun()
 
 # ✅ Display Chat History Organized by Date
 st.subheader("📜 Chat History")
