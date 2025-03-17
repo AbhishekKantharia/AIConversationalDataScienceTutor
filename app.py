@@ -3,13 +3,11 @@ import os
 import json
 import time
 import datetime
-import pandas as pd
-import plotly.express as px
+import requests
 import google.generativeai as genai
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from fpdf import FPDF
 from dotenv import load_dotenv
-import requests
 
 # ✅ Load API Key Securely
 load_dotenv()
@@ -22,16 +20,23 @@ if not API_KEY:
 genai.configure(api_key=API_KEY)
 chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=API_KEY)
 
-# ✅ Profanity Keywords for Automatic Banning
-PROFANITY_LIST = ["badword1", "badword2", "offensiveword3"]  # Add actual profanities
-
 # ✅ File Paths
 CHAT_SESSIONS_DIR = "chat_sessions"
 BANNED_IPS_FILE = "banned_ips.json"
 
 os.makedirs(CHAT_SESSIONS_DIR, exist_ok=True)
 
+# ✅ Initialize Session State Variables (Fix for KeyError)
+if "current_chat" not in st.session_state:
+    st.session_state.current_chat = None
+if "chat_sessions" not in st.session_state:
+    st.session_state.chat_sessions = [file.replace(".json", "") for file in os.listdir(CHAT_SESSIONS_DIR)]
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+
 # ✅ Ban IPs for Profanity
+PROFANITY_LIST = ["badword1", "badword2", "offensiveword3"]
+
 def get_user_ip():
     try:
         response = requests.get("https://api64.ipify.org?format=json")
@@ -78,21 +83,19 @@ st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout=
 
 # ✅ Sidebar: Theme & Settings
 st.sidebar.title("⚙️ Settings")
-st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.get("dark_mode", False))
+st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
 
 if st.session_state.dark_mode:
     st.markdown("""
         <style>
             body { background-color: #1E1E1E; color: white; }
+            .stApp { background-color: #1E1E1E; }
             .stButton>button { background-color: #444; color: white; border-radius: 5px; }
         </style>
     """, unsafe_allow_html=True)
 
 # ✅ Sidebar: Multi-Chat Support
 st.sidebar.title("📂 Chat Sessions")
-
-if "chat_sessions" not in st.session_state:
-    st.session_state.chat_sessions = [file.replace(".json", "") for file in os.listdir(CHAT_SESSIONS_DIR)]
 
 if st.sidebar.button("➕ New Chat"):
     new_chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
