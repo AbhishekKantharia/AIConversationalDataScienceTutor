@@ -3,9 +3,6 @@ import time
 import json
 import google.generativeai as genai
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.runnables import RunnableLambda, RunnablePassthrough
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.output_parsers import StrOutputParser
 import os
 import datetime
 import requests
@@ -26,14 +23,14 @@ chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=API
 PROFANITY_LIST = ["badword1", "badword2", "offensivephrase"]  # Add more words
 
 # ✅ IP Auto-Banning System
+BANNED_IPS_FILE = "banned_ips.json"
+
 def get_user_ip():
     try:
         response = requests.get("https://api64.ipify.org?format=json")
         return response.json()["ip"]
     except:
         return "Unknown"
-
-BANNED_IPS_FILE = "banned_ips.json"
 
 def load_banned_ips():
     try:
@@ -56,18 +53,18 @@ if user_ip in banned_ips:
 
 # ✅ Chat Management Functions
 CHAT_DIR = "chat_sessions"
+os.makedirs(CHAT_DIR, exist_ok=True)
 
-def get_chat_history(username):
-    chat_file = os.path.join(CHAT_DIR, f"{username}.json")
+def get_chat_history(chat_name):
+    chat_file = os.path.join(CHAT_DIR, f"{chat_name}.json")
     try:
         with open(chat_file, "r") as hfile:
             return json.load(hfile)
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
-def save_chat_history(username, chat_data):
-    os.makedirs(CHAT_DIR, exist_ok=True)
-    chat_file = os.path.join(CHAT_DIR, f"{username}.json")
+def save_chat_history(chat_name, chat_data):
+    chat_file = os.path.join(CHAT_DIR, f"{chat_name}.json")
     with open(chat_file, "w") as hfile:
         json.dump(chat_data, hfile, indent=4)
 
@@ -101,7 +98,8 @@ if not st.session_state.logged_in:
         else:
             st.session_state.username = username
             st.session_state.logged_in = True
-            st.session_state.chat_history = get_chat_history(username)
+            st.session_state.current_chat = f"Chat_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            save_chat_history(st.session_state.current_chat, [])
             st.rerun()
     st.stop()
 
@@ -113,11 +111,11 @@ if "current_chat" not in st.session_state:
     st.session_state.current_chat = f"Chat_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
 st.sidebar.subheader("📂 Chat Sessions")
-chat_names = os.listdir(CHAT_DIR) if os.path.exists(CHAT_DIR) else []
+chat_names = [f.replace(".json", "") for f in os.listdir(CHAT_DIR) if f.endswith(".json")]
 
 if chat_names:
-    selected_chat = st.sidebar.radio("Select Chat", chat_names)
-    st.session_state.current_chat = selected_chat.replace(".json", "")
+    selected_chat = st.sidebar.radio("Select Chat", chat_names, index=0)
+    st.session_state.current_chat = selected_chat
 
 if st.sidebar.button("➕ New Chat"):
     new_chat = f"Chat_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -127,17 +125,18 @@ if st.sidebar.button("➕ New Chat"):
 
 if st.sidebar.button("🗑 Delete Current Chat"):
     chat_path = os.path.join(CHAT_DIR, f"{st.session_state.current_chat}.json")
-    os.remove(chat_path)
-    st.success("Chat deleted successfully!")
-    st.rerun()
+    if os.path.exists(chat_path):
+        os.remove(chat_path)
+        st.success("Chat deleted successfully!")
+        st.rerun()
 
 # ✅ Chat Interface
 st.title("🧠 AI Data Science Tutor")
 
 # ✅ Display Chat History (Sorted by Date)
 chat_history = get_chat_history(st.session_state.current_chat)
-
 sorted_chats = {}
+
 for entry in chat_history:
     date = entry["timestamp"].split()[0]
     if date not in sorted_chats:
