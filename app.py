@@ -3,196 +3,220 @@ import json
 import os
 import time
 import datetime
+import pandas as pd
 import google.generativeai as genai
 import requests
+import plotly.express as px
+from dotenv import load_dotenv
+from fpdf import FPDF
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
-from dotenv import load_dotenv
 
-# ✅ Load API Key from Streamlit Secrets
+# ✅ Load API Key Securely
 load_dotenv()
 API_KEY = os.getenv("google_token")
-
 if not API_KEY:
-    st.error("⚠️ **API Key Missing**. Add `google_token` to your `.env` file.")
+    st.error("⚠️ Google GenAI API key is missing! Add it to `.env`.")
     st.stop()
 
 # ✅ Configure AI Model
 genai.configure(api_key=API_KEY)
-chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=API_KEY)
+MODEL = "gemini-1.5-pro"
 
-# ✅ Profanity Words List
-PROFANITY_WORDS = {"badword1", "badword2", "badword3"}  # Add actual words
+# ✅ AI System Prompt
+SYSTEM_PROMPT = SystemMessage(
+    content="""You are an AI Data Science Tutor specialized in industry applications.
+- Provide structured responses using headings, bullet points, and code blocks.
+- Cover Finance, Healthcare, Retail, and Manufacturing industries.
+- Offer insights on ML models, optimizations, datasets, and career advice.
+"""
+)
 
-# ✅ Function to Detect Profanity
-def contains_profanity(text):
-    return any(word in text.lower() for word in PROFANITY_WORDS)
-
-# ✅ Function to Get User IP
-def get_user_ip():
+# ✅ AI Response Generation (Structured)
+def get_ai_response(user_input):
     try:
-        response = requests.get("https://api64.ipify.org?format=json")
-        return response.json().get("ip", "Unknown")
-    except:
-        return "Unknown"
+        model = ChatGoogleGenerativeAI(model=MODEL, google_api_key=API_KEY)
+        response = model.invoke([SYSTEM_PROMPT, HumanMessage(content=user_input)])
+        if response and response.content:
+            return response.content.strip()
+        return "⚠️ No response generated."
+    except Exception as e:
+        return f"⚠️ API Error: {str(e)}"
 
-# ✅ Ban System
-BANNED_IPS_FILE = "banned_ips.json"
+# ✅ Load & Save Chat History
+CHAT_HISTORY_FILE = "chat_history.json"
 
-def load_banned_ips():
-    if os.path.exists(BANNED_IPS_FILE):
-        with open(BANNED_IPS_FILE, "r") as f:
+def load_chat_history():
+    if not os.path.exists(CHAT_HISTORY_FILE):
+        return []
+    try:
+        with open(CHAT_HISTORY_FILE, "r") as f:
             return json.load(f)
-    return []
+    except json.JSONDecodeError:
+        return []
 
-def save_banned_ip(ip):
-    banned_ips = load_banned_ips()
-    if ip not in banned_ips:
-        banned_ips.append(ip)
-        with open(BANNED_IPS_FILE, "w") as f:
-            json.dump(banned_ips, f)
-
-# ✅ Check if User is Banned
-user_ip = get_user_ip()
-if user_ip in load_banned_ips():
-    st.error("🚫 **You have been banned for inappropriate behavior.**")
-    st.stop()
+def save_chat_history():
+    with open(CHAT_HISTORY_FILE, "w") as f:
+        json.dump(st.session_state.chat_history, f, indent=4)
 
 # ✅ Initialize Session States
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
-if "multi_chat" not in st.session_state:
-    st.session_state.multi_chat = True
-if "chat_sessions" not in st.session_state:
-    st.session_state.chat_sessions = {}
-if "current_chat" not in st.session_state:
-    st.session_state.current_chat = None
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = load_chat_history()
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "code" not in st.session_state:
+    st.session_state.code = ""
 
 # ✅ Streamlit Page Config
-st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Industry AI Data Science Tutor", page_icon="🤖", layout="wide")
 
-# ✅ Dark Mode Toggle
-st.sidebar.header("⚙️ Settings")
+# ✅ Authentication System
+if not st.session_state.logged_in:
+    st.title("🔑 Login to AI Data Science Tutor")
+    username = st.text_input("Enter your username:")
+    role = st.selectbox("Select Role:", ["User", "Admin", "Business Analyst", "Data Scientist"])
+    
+    if st.button("Login"):
+        if not username:
+            st.warning("Please enter your username to proceed.")
+        else:
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.session_state.role = role
+            st.session_state.chat_history = load_chat_history()
+            st.rerun()
+    st.stop()
+
+st.sidebar.title("🔑 User")
+st.sidebar.write(f"👋 Welcome, {st.session_state.username}!")
+
+# ✅ Sidebar - Dark Mode Toggle
+st.sidebar.title("⚙️ Settings")
 st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
 
-# ✅ Apply Dark Mode Styling
+# Apply Dark Mode Styling
 if st.session_state.dark_mode:
     st.markdown(
         """
         <style>
-        body { background-color: #121212; color: white; }
-        .stApp { background-color: #121212; }
-        .stButton>button { background-color: #333; color: white; border-radius: 10px; }
+        body { background-color: #1E1E1E; color: white; }
+        .stApp { background-color: #1E1E1E; }
+        .stButton>button { background-color: #444; color: white; border-radius: 5px; }
         </style>
-        """,
-        unsafe_allow_html=True
+        """, unsafe_allow_html=True
     )
 
-# ✅ Chat Session Management
-st.sidebar.header("💬 Chat Sessions")
+# ✅ Sidebar - Chat History Actions
+st.sidebar.title("📜 Chat History")
+if st.sidebar.button("🗑 Clear Chat History"):
+    st.session_state.chat_history = []
+    save_chat_history()
+if st.sidebar.button("📥 Download Chat History"):
+    formatted_chat = "\n".join([f"**{entry['username']} ({entry['role']}):** {entry['message']}" for entry in st.session_state.chat_history])
+    st.sidebar.download_button(label="Download", data=formatted_chat, file_name="chat_history.txt", mime="text/plain")
 
-# ✅ Create New Chat
-if st.sidebar.button("➕ New Chat"):
-    chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
-    st.session_state.chat_sessions[chat_id] = {"messages": [], "timestamps": []}
-    st.session_state.current_chat = chat_id
+st.title("🧠 AI Data Science Tutor")
 
-# ✅ Select Existing Chat
-chat_names = list(st.session_state.chat_sessions.keys())
-if chat_names:
-    selected_chat = st.sidebar.radio("📌 Select a Chat", chat_names)
-    st.session_state.current_chat = selected_chat
+# ✅ Quick Questions
+quick_questions = [
+    "What is overfitting in ML?",
+    "Explain bias-variance tradeoff.",
+    "Types of regression?",
+    "Supervised vs. Unsupervised learning?",
+]
+cols = st.columns(len(quick_questions))
+for idx, question in enumerate(quick_questions):
+    if cols[idx].button(question):
+        st.session_state.chat_history.append({"username": st.session_state.username, "role": st.session_state.role, "message": question, "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+        response = get_ai_response(question)
+        st.session_state.chat_history.append({"username": "AI Assistant", "role": "AI", "message": response, "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+        save_chat_history()
+        st.rerun()
 
-# ✅ Rename Chat
-if st.session_state.current_chat:
-    new_chat_name = st.sidebar.text_input("✏️ Rename Chat", value=st.session_state.current_chat)
-    if st.sidebar.button("✅ Save Name"):
-        if new_chat_name and new_chat_name not in st.session_state.chat_sessions:
-            st.session_state.chat_sessions[new_chat_name] = st.session_state.chat_sessions.pop(st.session_state.current_chat)
-            st.session_state.current_chat = new_chat_name
-
-# ✅ Delete Chat
-if st.session_state.current_chat and st.sidebar.button("🗑 Delete Chat"):
-    del st.session_state.chat_sessions[st.session_state.current_chat]
-    st.session_state.current_chat = chat_names[0] if chat_names else None
-    st.experimental_rerun()
-
-# ✅ Fetch Chat History
-def get_chat_history():
-    if st.session_state.current_chat:
-        return st.session_state.chat_sessions[st.session_state.current_chat].get("messages", [])
-    return []
-
-# ✅ Chat Prompt Template (Fixing `history` issue)
-chat_prompt = ChatPromptTemplate(
-    messages=[
-        ("system", "You are a helpful AI Data Science Tutor. Respond professionally."),
-        MessagesPlaceholder(variable_name="history"),
-        ("human", "{user_input}"),
-    ]
-)
-output_parser = StrOutputParser()
-
-# ✅ Function to Get AI Response
-def get_ai_response(user_input):
-    history = get_chat_history()
-    
-    try:
-        response = chat_model.invoke([chat_prompt.format(user_input=user_input, history=history)])
-        return response.content if response else "⚠️ AI could not generate a response."
-    except Exception as e:
-        return f"⚠️ Error: {str(e)}"
-
-# ✅ Chat History with Date Timelines
-if st.session_state.current_chat:
-    chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
-    
-    # ✅ Display Messages by Date
-    st.title(f"📅 {st.session_state.current_chat}")
-    grouped_messages = {}
-    for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
-        date = timestamp.split()[0]
-        if date not in grouped_messages:
-            grouped_messages[date] = []
-        grouped_messages[date].append((msg, timestamp))
-    
-    for date, messages in grouped_messages.items():
-        st.subheader(f"📅 {date}")
-        for msg, timestamp in messages:
-            role = "user" if isinstance(msg, str) else "ai"
-            icon = "👤" if role == "user" else "🤖"
-            with st.chat_message(role):
-                st.markdown(f"**{icon} [{timestamp}]**: {msg}")
-
-# ✅ User Input
-user_input = st.chat_input("Ask a Data Science question...")
-
+# ✅ Chat Interface with Streaming Response
+user_input = st.chat_input("Ask an industry-specific AI question...")
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.session_state.chat_history.append({"username": st.session_state.username, "role": st.session_state.role, "message": user_input, "timestamp": timestamp})
 
-    # ✅ Check for Profanity
-    if contains_profanity(user_input):
-        save_banned_ip(user_ip)
-        st.error("🚫 **You have been banned for using inappropriate language.**")
-        st.stop()
-
-    # ✅ Append User Message
-    st.session_state.chat_sessions[st.session_state.current_chat]["messages"].append(user_input)
-    st.session_state.chat_sessions[st.session_state.current_chat]["timestamps"].append(timestamp)
-
-    # ✅ Get AI Response
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         response_text = ""
-
-        for word in get_ai_response(user_input).split():
+        ai_response = get_ai_response(user_input)
+        for word in ai_response.split():
             response_text += word + " "
             time.sleep(0.03)
-            response_placeholder.markdown(f"**🤖 [{timestamp}]**: {response_text}")
-
-    # ✅ Append AI Response
-    st.session_state.chat_sessions[st.session_state.current_chat]["messages"].append(response_text)
-    st.session_state.chat_sessions[st.session_state.current_chat]["timestamps"].append(timestamp)
-    
+            response_placeholder.markdown(response_text, unsafe_allow_html=True)
+            
+    st.session_state.chat_history.append({"username": "AI Assistant", "role": "AI", "message": response_text, "timestamp": timestamp})
+    save_chat_history()
     st.rerun()
+
+# ✅ Display Chat History Grouped by Date
+st.subheader("📜 Chat History")
+# Group messages by date
+grouped = {}
+for entry in st.session_state.chat_history:
+    date = entry["timestamp"].split()[0]
+    if date not in grouped:
+        grouped[date] = []
+    grouped[date].append(entry)
+
+for date, messages in grouped.items():
+    st.subheader(f"📅 {date}")
+    for entry in messages:
+        role_icon = "👤" if entry["role"].lower() != "ai" else "🤖"
+        with st.chat_message(entry["role"].lower()):
+            st.markdown(f"**[{entry['timestamp']}] {role_icon} {entry['username']}:**\n\n{entry['message']}", unsafe_allow_html=True)
+
+# ✅ Business Data Upload & AI Insights
+st.sidebar.title("📂 Upload Data for AI Analysis")
+uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
+    st.subheader("📊 Uploaded Data Preview")
+    st.dataframe(df.head())
+    
+    st.subheader("🔍 AI Insights on Data")
+    ai_data_analysis = get_ai_response(f"Analyze this dataset:\n\n{df.head().to_string()}")
+    st.markdown(ai_data_analysis)
+    
+    # Auto-Generated Visualizations
+    st.subheader("📊 AI-Generated Visualization")
+    fig = px.histogram(df, x=df.columns[0], title="Data Distribution")
+    st.plotly_chart(fig)
+
+# ✅ AI-Powered Resume Evaluator
+st.sidebar.title("💼 Job & Resume AI Insights")
+resume_text = st.sidebar.text_area("Paste your Resume for AI Analysis")
+if st.sidebar.button("🔍 Analyze Resume"):
+    ai_resume_feedback = get_ai_response(f"Analyze this resume for a data science job:\n\n{resume_text}")
+    st.sidebar.markdown(ai_resume_feedback)
+
+# ✅ Export Chat History as PDF
+def export_pdf():
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, "Chat History", ln=True, align="C")
+    pdf.ln(5)
+    for entry in st.session_state.chat_history:
+        pdf.set_font("Arial", style='B', size=12)
+        pdf.cell(0, 8, f"[{entry['timestamp']}] {entry['username']} ({entry['role']}):", ln=True)
+        pdf.set_font("Arial", size=11)
+        pdf.multi_cell(0, 7, entry['message'])
+        pdf.ln(3)
+    pdf_file_path = "chat_history.pdf"
+    pdf.output(pdf_file_path)
+    return pdf_file_path
+
+if st.sidebar.button("📥 Export Chat as PDF"):
+    pdf_path = export_pdf()
+    with open(pdf_path, "rb") as f:
+        st.sidebar.download_button(label="⬇️ Download PDF", data=f, file_name="chat_history.pdf", mime="application/pdf")
+        st.sidebar.success("✅ PDF is ready for download!")
