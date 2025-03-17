@@ -1,159 +1,189 @@
 import streamlit as st
-import time
 import json
+import os
+import time
+import datetime
 import google.generativeai as genai
+import requests
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
-import os
 from dotenv import load_dotenv
-import datetime
 
-# ✅ Load API Key Securely
+# ✅ Load API Key from Streamlit Secrets
 load_dotenv()
 API_KEY = os.getenv("google_token")
 
 if not API_KEY:
-    st.error("⚠️ **API KEY not found!** Please add your Google API key to the `.env` file.")
+    st.error("⚠️ **API Key Missing**. Add `google_token` to your `.env` file.")
     st.stop()
 
 # ✅ Configure AI Model
+genai.configure(api_key=API_KEY)
 chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=API_KEY)
 
-# ✅ Chat History Functions
-def get_chat_history(username):
-    """ Load user-specific chat history from a JSON file. """
+# ✅ Profanity Words List
+PROFANITY_WORDS = {"badword1", "badword2", "badword3"}  # Add actual words
+
+# ✅ Function to Detect Profanity
+def contains_profanity(text):
+    return any(word in text.lower() for word in PROFANITY_WORDS)
+
+# ✅ Function to Get User IP
+def get_user_ip():
     try:
-        with open(f"chat_history/{username}.json", "r") as file:
-            return json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+        response = requests.get("https://api64.ipify.org?format=json")
+        return response.json().get("ip", "Unknown")
+    except:
+        return "Unknown"
 
-def save_chat_history(username):
-    """ Save chat history to a JSON file. """
-    os.makedirs("chat_history", exist_ok=True)
-    with open(f"chat_history/{username}.json", "w") as file:
-        json.dump(st.session_state.chat_history, file, indent=4)
+# ✅ Ban System
+BANNED_IPS_FILE = "banned_ips.json"
 
-def delete_chat_history(username):
-    """ Delete chat history file. """
-    try:
-        os.remove(f"chat_history/{username}.json")
-        st.session_state.chat_history = []
-        st.success("✅ Chat history deleted successfully.")
-    except FileNotFoundError:
-        st.warning("⚠️ No chat history found to delete.")
+def load_banned_ips():
+    if os.path.exists(BANNED_IPS_FILE):
+        with open(BANNED_IPS_FILE, "r") as f:
+            return json.load(f)
+    return []
 
-def download_chat_history(username):
-    """ Provide an option to download the chat history as a text file. """
-    chat_history = get_chat_history(username)
-    if chat_history:
-        chat_text = "\n".join([f"User: {entry['user']}\nAI: {entry['ai']}\n" for entry in chat_history])
-        st.download_button(
-            label="📥 Download Chat History",
-            data=chat_text,
-            file_name=f"{username}_chat_history.txt",
-            mime="text/plain"
-        )
-    else:
-        st.warning("⚠️ No chat history available to download.")
+def save_banned_ip(ip):
+    banned_ips = load_banned_ips()
+    if ip not in banned_ips:
+        banned_ips.append(ip)
+        with open(BANNED_IPS_FILE, "w") as f:
+            json.dump(banned_ips, f)
 
-# ✅ Streamlit Page Config
-st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="centered")
-
-# ✅ Authentication System
-if "login" not in st.session_state:
-    st.session_state.login = False
-
-if not st.session_state.login:
-    st.title("🔑 AI Data Science Tutor")
-    username = st.text_input(label="Enter your username")
-    role = st.selectbox("Select Role:", ["User", "Admin"])
-
-    if st.button("Login"):
-        if not username:
-            st.error("⚠️ Please enter a username.")
-        else:
-            st.session_state.name = username
-            st.session_state.role = role
-            st.session_state.login = True
-            st.session_state.chat_history = get_chat_history(username)
-            
-            st.success("✅ Chat history loaded successfully." if st.session_state.chat_history else "✅ New session started.")
-            time.sleep(1)
-            st.rerun()
+# ✅ Check if User is Banned
+user_ip = get_user_ip()
+if user_ip in load_banned_ips():
+    st.error("🚫 **You have been banned for inappropriate behavior.**")
     st.stop()
 
-username = st.session_state.name
-role = st.session_state.role
+# ✅ Initialize Session States
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+if "multi_chat" not in st.session_state:
+    st.session_state.multi_chat = True
+if "chat_sessions" not in st.session_state:
+    st.session_state.chat_sessions = {}
+if "current_chat" not in st.session_state:
+    st.session_state.current_chat = None
 
-# ✅ Sidebar - User Info & Actions
-with st.sidebar:
-    st.title("🤖 AI Data Science Tutor")
-    st.write(f"👋 Welcome, **{username.title()}**! 🎉 ({role})")
-    st.write("""
-I’m here to help you with all things related to **Data Science**:
-- 📊 Machine Learning  
-- 📈 Data Visualization  
-- 📡 AI Algorithms  
-- 🐍 Python for Data Science  
-...and much more! 🚀
-""")
+# ✅ Streamlit Page Config
+st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
 
-    if st.button("🗑 Delete Chat History"):
-        delete_chat_history(username)
+# ✅ Dark Mode Toggle
+st.sidebar.header("⚙️ Settings")
+st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
 
-    download_chat_history(username)
+# ✅ Apply Dark Mode Styling
+if st.session_state.dark_mode:
+    st.markdown(
+        """
+        <style>
+        body { background-color: #121212; color: white; }
+        .stApp { background-color: #121212; }
+        .stButton>button { background-color: #333; color: white; border-radius: 10px; }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# ✅ Chat Session Management
+st.sidebar.header("💬 Chat Sessions")
+
+# ✅ Create New Chat
+if st.sidebar.button("➕ New Chat"):
+    chat_id = f"Chat {len(st.session_state.chat_sessions) + 1}"
+    st.session_state.chat_sessions[chat_id] = {"messages": [], "timestamps": []}
+    st.session_state.current_chat = chat_id
+
+# ✅ Select Existing Chat
+chat_names = list(st.session_state.chat_sessions.keys())
+if chat_names:
+    selected_chat = st.sidebar.radio("📌 Select a Chat", chat_names)
+    st.session_state.current_chat = selected_chat
+
+# ✅ Rename Chat
+if st.session_state.current_chat:
+    new_chat_name = st.sidebar.text_input("✏️ Rename Chat", value=st.session_state.current_chat)
+    if st.sidebar.button("✅ Save Name"):
+        if new_chat_name and new_chat_name not in st.session_state.chat_sessions:
+            st.session_state.chat_sessions[new_chat_name] = st.session_state.chat_sessions.pop(st.session_state.current_chat)
+            st.session_state.current_chat = new_chat_name
+
+# ✅ Delete Chat
+if st.session_state.current_chat and st.sidebar.button("🗑 Delete Chat"):
+    del st.session_state.chat_sessions[st.session_state.current_chat]
+    st.session_state.current_chat = chat_names[0] if chat_names else None
+    st.experimental_rerun()
 
 # ✅ Chat Prompt Template
 chat_prompt = ChatPromptTemplate(
     messages=[
-        ("system", """You are a professional AI Data Science Tutor.
-        - Answer only data science-related questions.
-        - If a question is **not** related to data science, respond with:
-        "I can only assist with Data Science topics. Please ask something relevant."
-        """),
+        ("system", "You are a helpful AI Data Science Tutor. Respond professionally."),
         MessagesPlaceholder(variable_name="history"),
         ("human", "{user_input}"),
     ]
 )
-
 output_parser = StrOutputParser()
-runnable_get_history = RunnableLambda(get_chat_history)
-chain = RunnablePassthrough.assign(history=runnable_get_history) | chat_prompt | chat_model | output_parser
 
-# ✅ Display Chat History
-if not get_chat_history(username):
-    st.chat_message("assistant").write("Feel free to ask anything about **Data Science**! 😊")
-else:
-    for entry in get_chat_history(username):
-        timestamp = entry.get("timestamp", "Unknown Time")
-        with st.chat_message("user"):
-            st.markdown(f"🕒 **{timestamp}**\n👤 **User:** {entry['user']}")
-        with st.chat_message("assistant"):
-            st.markdown(f"🕒 **{timestamp}**\n🤖 **AI:** {entry['ai']}")
+# ✅ Function to Get AI Response
+def get_ai_response(user_input):
+    try:
+        response = chat_model.invoke([chat_prompt.format(user_input=user_input)])
+        return response.content if response else "⚠️ AI could not generate a response."
+    except Exception as e:
+        return f"⚠️ Error: {str(e)}"
 
-# ✅ Chat Input
+# ✅ Chat History with Date Timelines
+if st.session_state.current_chat:
+    chat_data = st.session_state.chat_sessions[st.session_state.current_chat]
+    
+    # ✅ Display Messages by Date
+    st.title(f"📅 {st.session_state.current_chat}")
+    grouped_messages = {}
+    for msg, timestamp in zip(chat_data["messages"], chat_data["timestamps"]):
+        date = timestamp.split()[0]
+        if date not in grouped_messages:
+            grouped_messages[date] = []
+        grouped_messages[date].append((msg, timestamp))
+    
+    for date, messages in grouped_messages.items():
+        st.subheader(f"📅 {date}")
+        for msg, timestamp in messages:
+            role = "👤 User" if isinstance(msg, str) else "🤖 AI"
+            with st.chat_message(role):
+                st.markdown(f"**[{timestamp}] {role}:** {msg}")
+
+# ✅ User Input
 user_input = st.chat_input("Ask a Data Science question...")
 
 if user_input:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.session_state.chat_history.append({"user": user_input, "ai": "", "timestamp": timestamp})
 
-    with st.chat_message("user"):
-        st.markdown(f"🕒 **{timestamp}**\n👤 **User:** {user_input}")
+    # ✅ Check for Profanity
+    if contains_profanity(user_input):
+        save_banned_ip(user_ip)
+        st.error("🚫 **You have been banned for using inappropriate language.**")
+        st.stop()
 
+    # ✅ Append User Message
+    st.session_state.chat_sessions[st.session_state.current_chat]["messages"].append(user_input)
+    st.session_state.chat_sessions[st.session_state.current_chat]["timestamps"].append(timestamp)
+
+    # ✅ Get AI Response
     with st.chat_message("assistant"):
-        with st.spinner("Thinking... 🤔"):
-            try:
-                response = chain.invoke({"user_input": user_input})
-                st.markdown(f"🕒 **{timestamp}**\n🤖 **AI:** {response}")
+        response_placeholder = st.empty()
+        response_text = ""
 
-                st.session_state.chat_history[-1]["ai"] = response
-                save_chat_history(username)
+        for word in get_ai_response(user_input).split():
+            response_text += word + " "
+            time.sleep(0.03)
+            response_placeholder.markdown(response_text)
 
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"⚠️ **Error:** {e}")
+    # ✅ Append AI Response
+    st.session_state.chat_sessions[st.session_state.current_chat]["messages"].append(response_text)
+    st.session_state.chat_sessions[st.session_state.current_chat]["timestamps"].append(timestamp)
+    
+    st.rerun()
