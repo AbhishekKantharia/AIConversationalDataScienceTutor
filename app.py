@@ -1,173 +1,156 @@
 import streamlit as st
-import json
-import pandas as pd
-import google.generativeai as genai
-import os
 import time
-import datetime
-import plotly.express as px
+import json
+import os
+import google.generativeai as genai
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
-from fpdf import FPDF
-import io
-import sys
 
-# ✅ Securely Load API Key
+# ✅ Load API Key Securely
 load_dotenv()
-API_KEY = os.getenv("GEMINI_API_KEY")
-if not API_KEY:
-    st.error("⚠️ Google GenAI API key is missing! Add it to `.env`.")
+api_key = os.getenv("GOOGLE_API_KEY")
+
+if not api_key:
+    st.error("⚠️ **API KEY not found**❗❗❗ Please add your Google API key to the `.env` file.")
     st.stop()
 
-# ✅ Configure AI Model
-genai.configure(api_key=API_KEY)
-MODEL = "gemini-1.5-pro"
+# ✅ Initialize Google API and AI Model
+chat_model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
 
-# ✅ AI System Instructions
-SYSTEM_PROMPT = """You are an AI Data Science Tutor.
-- Provide structured insights for **Finance, Healthcare, Retail, and Manufacturing**.
-- Offer **ML model suggestions, hyperparameter tuning, and dataset recommendations**.
-- Explain **concepts with examples and code snippets** when needed.
-- Format responses using **headings, bullet points, and markdown formatting**.
-"""
+# ✅ Chat History Functions
+CHAT_DIR = "chat_history"
+os.makedirs(CHAT_DIR, exist_ok=True)
 
-# ✅ AI Response Generation (Improved Streaming)
-def get_ai_response(user_input):
+def get_chat_history(username):
+    """Load chat history from a file."""
     try:
-        model = genai.GenerativeModel(MODEL)
-        response = model.generate_content(f"{SYSTEM_PROMPT}\n\nQuestion: {user_input}")
-        return response.text if response and response.text else "⚠️ No response generated."
-    except Exception as e:
-        return f"⚠️ API Error: {str(e)}"
-
-# ✅ Load & Save Chat History
-CHAT_HISTORY_FILE = "chat_history.json"
-
-def load_chat_history():
-    try:
-        with open(CHAT_HISTORY_FILE, "r") as f:
-            return json.load(f)
+        with open(f"{CHAT_DIR}/{username}.json", "r") as hfile:
+            return json.load(hfile)
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
-def save_chat_history():
-    with open(CHAT_HISTORY_FILE, "w") as f:
-        json.dump(st.session_state.chat_history, f, indent=4)
+def save_chat_history(username):
+    """Save chat history to a file."""
+    with open(f"{CHAT_DIR}/{username}.json", "w") as hfile:
+        json.dump(st.session_state.chat_history, hfile, indent=4)
 
-# ✅ Initialize Session States
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = False
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = load_chat_history()
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+def delete_chat_history(username):
+    """Delete chat history for a user."""
+    try:
+        os.remove(f"{CHAT_DIR}/{username}.json")
+        st.session_state.chat_history = []
+        st.success("✅ Chat history deleted successfully.")
+    except FileNotFoundError:
+        st.warning("⚠️ No chat history found to delete.")
+
+def download_chat_history(username):
+    """Download chat history as a text file."""
+    chat_history = get_chat_history(username)
+    if chat_history:
+        chat_text = "\n".join([f"User: {chat['user']}\nAI: {chat['ai']}\n" for chat in chat_history])
+        st.download_button(
+            label="⬇️ Download Chat History",
+            data=chat_text,
+            file_name=f"{username}_chat_history.txt",
+            mime="text/plain"
+        )
+    else:
+        st.warning("⚠️ No chat history available to download.")
 
 # ✅ Streamlit Page Config
-st.set_page_config(page_title="AI Data Science Tutor", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Data Science AI Tutor", page_icon="🤖", layout="centered")
 
 # ✅ User Authentication
-if not st.session_state.logged_in:
-    st.title("🔑 Login to AI Data Science Tutor")
+if "login" not in st.session_state:
+    st.session_state.login = False
+
+if not st.session_state.login:
+    st.title("🤖 Data Science Tutor")
     username = st.text_input("Enter your username:")
-    role = st.selectbox("Select Role:", ["User", "Admin", "Business Analyst", "Data Scientist"])
-    
     if st.button("Login"):
         if not username:
-            st.warning("Please enter your username to proceed.")
+            st.error("⚠️ Please enter a username.")
         else:
-            st.session_state.logged_in = True
-            st.session_state.username = username
-            st.session_state.role = role
+            st.session_state.name = username
+            st.session_state.login = True
+            st.session_state.chat_history = get_chat_history(username)
+            st.success("✅ Chat history loaded!" if st.session_state.chat_history else "🆕 New session started.")
+            time.sleep(1)
             st.rerun()
     st.stop()
 
-st.sidebar.title("🔑 User")
-st.sidebar.write(f"👋 Welcome, {st.session_state.username}! ({st.session_state.role})")
+# ✅ Sidebar for User Info and Chat Controls
+username = st.session_state.name
+with st.sidebar:
+    st.write(f"### 👋 Hello, {username.title()}! 🎉")
+    st.write("""
+#### Welcome to the AI Data Science Tutor 🤖
+I can help with:
+- 🧠 Machine Learning
+- 📊 Data Analysis & Visualization
+- 🤖 AI & Deep Learning
+- 📝 Python for Data Science
+""")
+    if st.button("🗑 Delete Chat History"):
+        delete_chat_history(username)
+    download_chat_history(username)
 
-# ✅ Dark Mode Toggle
-st.sidebar.title("⚙️ Settings")
-st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
+# ✅ Display Chat History
+if not st.session_state.chat_history:
+    st.chat_message("assistant").write("💡 **Tip:** Ask me anything related to **data science**!")
+else:
+    for chat in st.session_state.chat_history:
+        with st.chat_message("user"):
+            st.markdown(f"**🧑‍💻 User:** {chat['user']}")
+        with st.chat_message("assistant"):
+            st.markdown(f"**🤖 AI:** {chat['ai']}")
 
-# ✅ Industry-Specific Topics
-st.sidebar.title("🏢 Industry Use Cases")
-industry = st.sidebar.selectbox("Select Industry", ["Finance", "Healthcare", "Retail", "Manufacturing", "General AI"])
+# ✅ AI Chat Prompt Template
+chat_prompt = ChatPromptTemplate(
+    messages=[
+        ("system", """
+        You are a Data Science AI Tutor. Your job is to:
+        - Answer **ONLY** data science-related questions.
+        - Provide structured answers with **examples, bullet points, and code snippets** if needed.
+        - If a question is **not related** to data science, respond with:
+          "I am unable to answer that question. Please ask something related to data science."
+        """),
+        MessagesPlaceholder(variable_name="history"),
+        ("human", "{user_input}")
+    ],
+)
 
-# ✅ Chat UI
-st.title("🧠 AI Data Science Tutor")
-user_input = st.chat_input("Ask an AI-powered question...")
+# ✅ AI Processing Chain
+output_parser = StrOutputParser()
+runnable_get_history = RunnableLambda(get_chat_history)
+chain = RunnablePassthrough.assign(history=runnable_get_history) | chat_prompt | chat_model | output_parser
+
+# ✅ Chat Input with Streaming AI Response
+user_input = st.chat_input("💬 Ask a Data Science question...")
 
 if user_input:
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.session_state.chat_history.append(("user", user_input, timestamp))
+    with st.chat_message("user"):
+        st.markdown(f"**🧑‍💻 User:** {user_input}")
 
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         response_text = ""
+        
+        with st.spinner("🤔 AI is thinking..."):
+            try:
+                ai_response = chain.invoke({"user_input": user_input})
+                for word in ai_response.split():
+                    response_text += word + " "
+                    time.sleep(0.03)  # Simulate real-time typing
+                    response_placeholder.markdown(response_text)
 
-        for word in get_ai_response(user_input).split():
-            response_text += word + " "
-            time.sleep(0.02)  # Simulating real-time streaming
-            response_placeholder.markdown(response_text)
+                # Save chat history
+                st.session_state.chat_history.append({"user": user_input, "ai": response_text})
+                save_chat_history(username)
+                st.rerun()
 
-    st.session_state.chat_history.append(("assistant", response_text, timestamp))
-    save_chat_history()
-    st.rerun()
-
-# ✅ Display Chat History with Structured Formatting
-st.subheader("📜 Chat History")
-for role, msg, timestamp in st.session_state.chat_history:
-    role_display = "👤 **User:**" if role == "user" else "🤖 **AI:**"
-    with st.chat_message(role):
-        st.markdown(f"**[{timestamp}] {role_display}**\n\n{msg}", unsafe_allow_html=True)
-
-# ✅ AI-Powered Resume Evaluator
-st.sidebar.title("💼 Job & Resume AI Insights")
-resume_text = st.sidebar.text_area("Paste your Resume for AI Analysis")
-
-if st.sidebar.button("🔍 Analyze Resume"):
-    ai_resume_feedback = get_ai_response(f"Analyze this resume for a data science job:\n\n{resume_text}")
-    st.sidebar.markdown(ai_resume_feedback)
-
-# ✅ Upload Data for AI Analysis
-st.sidebar.title("📂 Upload Data for AI Analysis")
-uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
-
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
-    st.subheader("📊 Uploaded Data Preview")
-    st.dataframe(df.head())
-
-    st.subheader("🔍 AI Insights on Data")
-    ai_data_analysis = get_ai_response(f"Analyze this dataset:\n\n{df.head().to_string()}")
-    st.markdown(ai_data_analysis)
-
-    # ✅ Auto-Generated Visualizations
-    st.subheader("📊 AI-Generated Visualization")
-    fig = px.histogram(df, x=df.columns[0], title="Data Distribution")
-    st.plotly_chart(fig)
-
-# ✅ AI-Powered PDF Chat Export
-def export_pdf():
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-
-    pdf.cell(200, 10, "Chat History", ln=True, align="C")
-    pdf.ln(5)
-
-    for role, msg, timestamp in st.session_state.chat_history:
-        pdf.set_font("Arial", style='B', size=12)
-        pdf.cell(0, 8, f"[{timestamp}] {'User' if role == 'user' else 'AI'}:", ln=True)
-        pdf.set_font("Arial", size=11)
-        pdf.multi_cell(0, 7, msg)
-        pdf.ln(3)
-
-    pdf_file_path = "chat_history.pdf"
-    pdf.output(pdf_file_path)
-    return pdf_file_path
-
-if st.sidebar.button("📥 Export Chat as PDF"):
-    pdf_path = export_pdf()
-    with open(pdf_path, "rb") as f:
-        st.sidebar.download_button(label="⬇️ Download PDF", data=f, file_name="chat_history.pdf", mime="application/pdf")
-        st.sidebar.success("✅ PDF is ready for download!")
+            except Exception as e:
+                st.error(f"⚠️ AI Error: {e}")
