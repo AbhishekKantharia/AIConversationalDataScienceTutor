@@ -118,7 +118,13 @@ if st.session_state.current_chat and st.sidebar.button("🗑 Delete Chat"):
     st.session_state.current_chat = chat_names[0] if chat_names else None
     st.experimental_rerun()
 
-# ✅ Chat Prompt Template
+# ✅ Fetch Chat History
+def get_chat_history():
+    if st.session_state.current_chat:
+        return st.session_state.chat_sessions[st.session_state.current_chat].get("messages", [])
+    return []
+
+# ✅ Chat Prompt Template (Fixing `history` issue)
 chat_prompt = ChatPromptTemplate(
     messages=[
         ("system", "You are a helpful AI Data Science Tutor. Respond professionally."),
@@ -130,8 +136,10 @@ output_parser = StrOutputParser()
 
 # ✅ Function to Get AI Response
 def get_ai_response(user_input):
+    history = get_chat_history()
+    
     try:
-        response = chat_model.invoke([chat_prompt.format(user_input=user_input)])
+        response = chat_model.invoke([chat_prompt.format(user_input=user_input, history=history)])
         return response.content if response else "⚠️ AI could not generate a response."
     except Exception as e:
         return f"⚠️ Error: {str(e)}"
